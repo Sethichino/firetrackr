@@ -182,29 +182,43 @@
             header: true,
             skipEmptyLines: true,
             transformHeader: function(header) {
-                // Strip hidden Excel BOM characters and replace spaces with underscores
-                return header.replace(/^\uFEFF/, '').trim().replace(/\s+/g, '_');
+                // Strip BOM, replace all spaces/special characters with underscores, and convert to lowercase
+                return header.replace(/^\uFEFF/, '').trim().replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
             },
             complete: async function(results) {
-                // 1. Deduplicate by Business Name + Street Address
                 let validRecords = new Map();
+                
                 results.data.forEach(row => {
-                    // Fallbacks in case the CRM uses slightly different naming conventions
-                    let bizName = row.Business_Name || row.Company || row.Account_Name || row.Account || row.Customer;
-                    let street = row.Street_Address || row.Address || row.Address_1 || row.Street;
+                    // Expansive fallbacks using lowercase to catch any CRM export variation
+                    let bizName = row.business_name || row.company || row.company_name || row.account_name || row.account || row.customer || row.name;
+                    let street = row.street_address || row.address || row.address_1 || row.street || row.address_line_1;
                     
                     if (bizName && street) {
                         let key = `${bizName.trim().toLowerCase()}|${street.trim().toLowerCase()}`;
                         if (!validRecords.has(key)) {
-                            // Ensure standard mapping for the UI bottom sheet
+                            // Map the found lowercase fields back to the Title Case expected by the UI
                             row.Business_Name = bizName;
                             row.Street_Address = street;
+                            
+                            // Map remaining fields flexibly
+                            row['City, State, Zip'] = row.city_state_zip || row.city || row.zip || '';
+                            row.Contact_Name = row.contact_name || row.contact || row.first_name || '';
+                            row.Phone = row.phone || row.phone_number || row.mobile || '';
+                            row.Email = row.email || row.email_address || '';
+                            row.Inspection_Date = row.inspection_date || row.date || row.last_inspection || '';
+                            
                             validRecords.set(key, row);
                         }
                     }
                 });
                 
                 let uniqueAccounts = Array.from(validRecords.values());
+                
+                // Diagnostic check: if it still finds 0, alert the user with their exact column names
+                if (uniqueAccounts.length === 0 && results.data.length > 0) {
+                    alert("Column mismatch. We found 0 accounts. Your file has these columns:\n\n" + Object.keys(results.data[0]).join(", ") + "\n\nPlease ensure your spreadsheet has columns that can act as a Business Name and an Address.");
+                    return;
+                }
                 
                 // 2. Process Mock Geocoding
                 allAccounts = await runMockGeocoder(uniqueAccounts);
