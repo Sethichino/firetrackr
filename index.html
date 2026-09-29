@@ -305,10 +305,13 @@ let map;
         }
     }
 
-    // UI Bottom Sheet
+  // UI Bottom Sheet
     function showDetails(acc, distance) {
+        // Force the Business Name to be the primary title
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
         document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
+        
+        // Ensure Contact Name remains in the contact tab
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-date').innerText = acc.Inspection_Date || 'N/A';
         
@@ -334,13 +337,6 @@ let map;
         }
         
         document.getElementById('bottom-sheet').classList.add('active');
-    }
-
-    function closeSheet() {
-        document.getElementById('bottom-sheet').classList.remove('active');
-    }
-
-    window.onload = initMap;
-</script>
+    }</script>
 </body>
 </html>
