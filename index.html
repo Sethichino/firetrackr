@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#d32f2f">
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Firetrackr","short_name":"Firetrackr","display":"standalone","start_url":"."}'>
+    <title>Firetrackr</title>
+    
+    <!-- Leaflet JS & CSS for Mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- PapaParse for CSV Processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <style>
+        :root { --primary: #d32f2f; --bg: #f5f5f5; --text: #333; }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); overflow: hidden; }
+        
+        #app-container { display: flex; flex-direction: column; height: 100vh; }
+        #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; text-align: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; }
+        
+        #controls { padding: 10px; background: white; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 12px; }
+        .control-group { display: flex; flex-direction: column; gap: 4px; }
+        .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+        label { font-size: 0.85rem; font-weight: bold; color: #555; }
+        
+        input[type="file"], input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        input[type="range"] { width: 100%; }
+        
+        #map { flex-grow: 1; width: 100%; z-index: 1; }
+        
+        /* Bottom Sheet UI */
+        #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; }
+        #bottom-sheet.active { transform: translateY(0); }
+        
+        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
+        .sheet-title { font-size: 1.3rem; font-weight: bold; color: var(--text); margin: 0; }
+        .sheet-subtitle { font-size: 0.9rem; color: #666; margin: 4px 0 0 0; }
+        .close-btn { background: none; color: #999; font-size: 1.8rem; border: none; padding: 0; line-height: 1; margin-top: -5px; cursor: pointer; }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-item { font-size: 0.85rem; color: #555; }
+        .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
+        
+        .actions { display: flex; gap: 10px; }
+        .action-btn { flex: 1; padding: 14px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        .call-btn { background: #2e7d32; }
+        .email-btn { background: #1565c0; }
+        
+        /* Loading Overlay */
+        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="header">Firetrackr</div>
+    
+    <div id="controls">
+        <div class="control-group">
+            <label>Upload CRM Export (CSV)</label>
+            <input type="file" id="csv-file" accept=".csv">
+        </div>
+        
+        <div class="row">
+            <div class="control-group" style="flex: 1;">
+                <label>Radius: <span id="radius-val">10</span> miles</label>
+                <input type="range" id="radius-slider" min="1" max="25" value="10" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="control-group" style="flex: 1;">
+                <label>Inspections From</label>
+                <input type="date" id="start-date" onchange="filterMap()">
+            </div>
+            <div class="control-group" style="flex: 1;">
+                <label>To</label>
+                <input type="date" id="end-date" onchange="filterMap()">
+            </div>
+        </div>
+    </div>
+    
+    <div id="map"></div>
+</div>
+
+<!-- Bottom Details Card -->
+<div id="bottom-sheet">
+    <div class="sheet-header">
+        <div>
+            <h2 class="sheet-title" id="sheet-title">Business Name</h2>
+            <p class="sheet-subtitle" id="sheet-address">123 Street, City, State Zip</p>
+        </div>
+        <button class="close-btn" onclick="closeSheet()">×</button>
+    </div>
+    
+    <div class="info-grid">
+        <div class="info-item">
+            <strong>Contact</strong>
+            <span id="sheet-contact">John Doe</span>
+        </div>
+        <div class="info-item">
+            <strong>Inspection Date</strong>
+            <span id="sheet-date">2026-10-15</span>
+        </div>
+    </div>
+    
+    <div class="actions">
+        <a href="#" id="action-call" class="action-btn call-btn">📞 Call</a>
+        <a href="#" id="action-email" class="action-btn email-btn">✉️ Email</a>
+    </div>
+</div>
+
+<!-- Loader -->
+<div id="loading-overlay">
+    <div class="spinner"></div>
+    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing Data...</div>
+</div>
+
+<script>
+    let map;
+    let markersLayer = L.layerGroup();
+    let allAccounts = [];
+    let userLat = 30.2672; // Default to Austin, TX
+    let userLon = -97.7431;
+
+    // Initialize Map
+    function initMap() {
+        map = L.map('map').setView([userLat, userLon], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+        markersLayer.addTo(map);
+
+        // Get Real-time GPS Location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                userLat = pos.coords.latitude;
+                userLon = pos.coords.longitude;
+                map.setView([userLat, userLon], 11);
+                
+                // Plot User Location
+                L.circleMarker([userLat, userLon], {
+                    radius: 8,
+                    fillColor: "#2196F3",
+                    color: "#fff",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 1
+                }).addTo(map).bindPopup("<b>Your Current Location</b>");
+                
+            }, err => {
+                alert("Location access denied or unavailable. Defaulting to Central Texas territory.");
+            });
+        }
+    }
+
+    // Haversine Distance Formula (Miles)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 3958.8;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c;
+    }
+
+    // CSV Upload & Parsing
+    document.getElementById('csv-file').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if (!file) return;
+        
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async function(results) {
+                // 1. Deduplicate by Business Name + Street Address
+                let validRecords = new Map();
+                results.data.forEach(row => {
+                    if (row.Business_Name && row.Street_Address) {
+                        let key = `${row.Business_Name.trim().toLowerCase()}|${row.Street_Address.trim().toLowerCase()}`;
+                        if (!validRecords.has(key)) {
+                            validRecords.set(key, row);
+                        }
+                    }
+                });
+                
+                let uniqueAccounts = Array.from(validRecords.values());
+                
+                // 2. Process Mock Geocoding
+                allAccounts = await runMockGeocoder(uniqueAccounts);
+                
+                // 3. Plot Map
+                filterMap();
+                
+                // Reset file input
+                e.target.value = '';
+            }
+        });
+    });
+
+    // Mock Loader: Simulates address geocoding instantly around the user's location
+    async function runMockGeocoder(accounts) {
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('loading-text').innerText = `Geocoding ${accounts.length} accounts...`;
+        
+        // Simulate API delay for prototype realism
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        accounts.forEach(acc => {
+            // Generate mock coordinates within a realistic territory radius of the user for immediate UI testing
+            const radius = (Math.random() * 30) / 69; 
+            const angle = Math.random() * Math.PI * 2;
+            acc.lat = userLat + (radius * Math.cos(angle));
+            acc.lon = userLon + (radius * Math.sin(angle));
+        });
+        
+        document.getElementById('loading-overlay').style.display = 'none';
+        return accounts;
+    }
+
+    // Filter Logic
+    function filterMap() {
+        markersLayer.clearLayers();
+        closeSheet();
+        
+        let radius = parseFloat(document.getElementById('radius-slider').value);
+        let startDate = document.getElementById('start-date').value;
+        let endDate = document.getElementById('end-date').value;
+        
+        let matchCount = 0;
+        let bounds = L.latLngBounds();
+
+        allAccounts.forEach(acc => {
+            if (!acc.lat || !acc.lon) return;
+            
+            let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
+            if (distance > radius) return;
+            
+            if (startDate && acc.Inspection_Date < startDate) return;
+            if (endDate && acc.Inspection_Date > endDate) return;
+            
+            let marker = L.marker([acc.lat, acc.lon]);
+            marker.on('click', () => showDetails(acc, distance));
+            markersLayer.addLayer(marker);
+            
+            bounds.extend([acc.lat, acc.lon]);
+            matchCount++;
+        });
+
+        // Auto-zoom to fit filtered pins if any exist
+        if (matchCount > 0) {
+            map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+        } else {
+            map.setView([userLat, userLon], 10);
+        }
+    }
+
+    // UI Bottom Sheet
+    function showDetails(acc, distance) {
+        document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
+        document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
+        document.getElementById('sheet-date').innerText = acc.Inspection_Date || 'N/A';
+        
+        let callBtn = document.getElementById('action-call');
+        let emailBtn = document.getElementById('action-email');
+        
+        // Setup Call Button
+        if (acc.Phone) {
+            callBtn.href = `tel:${acc.Phone.replace(/[^0-9]/g, '')}`;
+            callBtn.style.display = 'flex';
+        } else {
+            callBtn.style.display = 'none';
+        }
+        
+        // Setup Email Button with required signature
+        if (acc.Email) {
+            let subject = encodeURIComponent(`Firetrol Life Safety Services: ${acc.Business_Name}`);
+            let signature = `\n\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
+            let body = encodeURIComponent(`Hello ${acc.Contact_Name || ''},\n\nI am reaching out regarding the fire and life safety inspections at ${acc.Business_Name}.${signature}`);
+            
+            emailBtn.href = `mailto:${acc.Email}?subject=${subject}&body=${body}`;
+            emailBtn.style.display = 'flex';
+        } else {
+            emailBtn.style.display = 'none';
+        }
+        
+        document.getElementById('bottom-sheet').classList.add('active');
+    }
+
+    function closeSheet() {
+        document.getElementById('bottom-sheet').classList.remove('active');
+    }
+
+    // Initialize map on load
+    window.onload = initMap;
+</script>
+</body>
+</html>
