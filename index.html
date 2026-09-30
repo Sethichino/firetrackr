@@ -33,9 +33,17 @@
         textarea { resize: vertical; min-height: 80px; }
         input[type="range"] { width: 100%; }
         
+        /* Custom Toggle Switch for Active Alarms */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #d32f2f; }
+        input:checked + .slider:before { transform: translateX(20px); }
+        
         #map { flex-grow: 1; width: 100%; z-index: 1; }
         
-        #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; }
+        #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; max-height: 85vh; overflow-y: auto;}
         #bottom-sheet.active { transform: translateY(0); }
         
         .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
@@ -46,6 +54,13 @@
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         .info-item { font-size: 0.85rem; color: #555; }
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
+        
+        /* Alarm History UI */
+        #alarm-history-container { margin-bottom: 20px; border: 1px solid #ffcdd2; border-radius: 8px; overflow: hidden; display: none; }
+        .alarm-header { background: #d32f2f; color: white; padding: 8px 12px; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;}
+        .alarm-list { background: #ffebee; padding: 10px; max-height: 150px; overflow-y: auto; }
+        .alarm-item { font-size: 0.85rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #ffcdd2; }
+        .alarm-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
         
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .action-btn { padding: 12px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 0.95rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
@@ -94,16 +109,7 @@
         
         @media print {
             #app-container, #bottom-sheet, #survey-modal, #loading-overlay, #manual-modal { display: none !important; }
-            #print-container { 
-                display: block !important; 
-                position: absolute; 
-                left: 0; 
-                top: 0; 
-                width: 100%; 
-                background: white !important; 
-                color: black !important;
-                font-family: Helvetica, Arial, sans-serif;
-            }
+            #print-container { display: block !important; position: absolute; left: 0; top: 0; width: 100%; background: white !important; color: black !important; font-family: Helvetica, Arial, sans-serif; }
             body { background: white !important; }
             .print-page-break { page-break-inside: avoid; margin-bottom: 25px; display: block; }
         }
@@ -120,11 +126,18 @@
     <div id="controls">
         <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9; margin-bottom: 5px;">
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
-            <div style="display: flex; gap: 8px;">
-                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Add/Update Export</button>
-                <button onclick="openManualModal()" style="flex: 1; padding: 12px; background: #f57c00; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">➕ Add Manual Lead</button>
+            
+            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Leads</button>
+                
+                <!-- NEW: Alarm Import Button -->
+                <button onclick="document.getElementById('alarm-file').click()" style="flex: 1; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">🔥 Import Alarms</button>
             </div>
-            <button onclick="clearData()" style="width: 100%; padding: 8px; background: none; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 6px; font-weight: bold; font-size: 0.85rem; cursor: pointer; margin-top: 10px;">🗑️ Delete All Data</button>
+            
+            <div style="display: flex; gap: 8px;">
+                <button onclick="openManualModal()" style="flex: 1; padding: 12px; background: #f57c00; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">➕ Add Manual Lead</button>
+                <button onclick="clearData()" style="flex: 1; padding: 12px; background: none; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 6px; font-weight: bold; font-size: 0.85rem; cursor: pointer;">🗑️ Delete All</button>
+            </div>
         </div>
 
         <div class="control-group" id="upload-group">
@@ -132,10 +145,22 @@
             <input type="file" id="csv-file" accept=".csv">
         </div>
         
+        <!-- Hidden input for Alarm CSV -->
+        <input type="file" id="alarm-file" accept=".csv" style="display:none;">
+        
         <div class="row">
             <div class="control-group" style="flex: 1;">
                 <label>Radius: <span id="radius-val">2</span> miles</label>
                 <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+            </div>
+            
+            <!-- NEW: Active Alarms Filter Toggle -->
+            <div class="control-group" style="align-items: center; justify-content: center;">
+                <label style="margin-bottom: 4px; color: #d32f2f;">🔥 Active Alarms</label>
+                <label class="switch">
+                  <input type="checkbox" id="alarm-filter-toggle" onchange="filterMap()">
+                  <span class="slider"></span>
+                </label>
             </div>
         </div>
     </div>
@@ -180,6 +205,17 @@
             <p class="sheet-subtitle" id="sheet-address">123 Street, City, State Zip</p>
         </div>
         <button class="close-btn" onclick="closeSheet()">×</button>
+    </div>
+    
+    <!-- NEW: Alarm History Display -->
+    <div id="alarm-history-container">
+        <div class="alarm-header">
+            <span>🚨 Recent Alarm Activity</span>
+            <span id="alarm-count-badge" style="background: white; color: #d32f2f; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem;">0</span>
+        </div>
+        <div class="alarm-list" id="alarm-list-content">
+            <!-- Injected Alarm Data -->
+        </div>
     </div>
     
     <div class="info-grid">
@@ -266,6 +302,13 @@
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
+    
+    // NEW: Fire icon for active alarms
+    const fireIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    });
 
     function initMap() {
         map = L.map('map').setView([userLat, userLon], 10);
@@ -297,12 +340,13 @@
     }
 
     function clearData() {
-        if(confirm("Are you sure you want to permanently delete all leads, surveys, and photos?")) {
+        if(confirm("Are you sure you want to permanently delete all leads, surveys, alarms, and photos?")) {
             localStorage.removeItem('firetrackr_accounts');
             allAccounts = []; markersLayer.clearLayers();
             document.getElementById('upload-group').style.display = 'flex';
             document.getElementById('data-status-container').style.display = 'none';
             document.getElementById('csv-file').value = '';
+            document.getElementById('alarm-file').value = '';
             map.setView([userLat, userLon], 10);
             closeSheet();
         }
@@ -315,28 +359,25 @@
         return R * c;
     }
 
-    // STRICT Data extraction. Blocks Web Address fields natively exported by Dynamics CRM
     function extractTextData(value) {
         if (value === null || value === undefined) return '';
-        
         if (typeof value === 'object') {
             try {
                 if (Array.isArray(value) && value.length > 0) value = value[0];
                 if (value.name) return String(value.name).trim();
                 if (value.text) return String(value.text).trim();
                 if (value.value) return String(value.value).trim();
-                
                 let flatString = JSON.stringify(value).replace(/[{}"\[\]]/g, ' ').trim();
                 return flatString.split(',')[0].trim();
             } catch (e) { return ''; }
         }
-        
         let strVal = String(value).trim();
         if (strVal.includes('[object')) return '';
         if (strVal === 'undefined' || strVal === 'null') return '';
         return strVal;
     }
 
+    // LEAD IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -347,19 +388,13 @@
                 if (results.data.length === 0) return;
                 
                 let headers = results.meta.fields;
-                
-                // Advanced column sniffing blocking Dynamics URL columns
                 let nameField = headers.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || headers[0];
-                
                 let addressField = headers.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || headers.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
                 
-                // If the CRM named the column something bizarre, scan row 1 for a physical address pattern
                 if (!addressField) {
                     for (let h of headers) {
                         let sample = String(results.data[0][h] || '').trim();
-                        if (/^\d+\s+[a-zA-Z]/.test(sample) && !/^\d{5}/.test(sample)) { 
-                            addressField = h; break; 
-                        }
+                        if (/^\d+\s+[a-zA-Z]/.test(sample) && !/^\d{5}/.test(sample)) { addressField = h; break; }
                     }
                 }
                 if (!addressField) addressField = headers[1];
@@ -368,7 +403,6 @@
                 let stateField = headers.find(h => /state|province/i.test(h));
                 let zipField = headers.find(h => /zip|postal/i.test(h));
                 let combinedCityStateField = headers.find(h => /city, state|city state/i.test(h));
-                
                 let contactField = headers.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
                 let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
 
@@ -404,7 +438,7 @@
                             newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
                                 'City, State, Zip': extractedCityStateZip, Contact_Name: extractTextData(row[contactField]),
-                                Phone: extractTextData(row[phoneField]), visited: false, surveys: [] 
+                                Phone: extractTextData(row[phoneField]), visited: false, surveys: [], alarms: [] // Initialize empty alarm array
                             });
                         }
                     }
@@ -429,19 +463,92 @@
         });
     });
 
+    // NEW ALARM IMPORTER
+    document.getElementById('alarm-file').addEventListener('change', function(e) {
+        let file = e.target.files[0];
+        if (!file) return;
+        if (allAccounts.length === 0) {
+            alert("Please import your standard CRM leads first so we have addresses to attach the alarms to.");
+            e.target.value = '';
+            return;
+        }
+
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('loading-text').innerText = `Processing Alarm History...`;
+
+        Papa.parse(file, {
+            header: true, skipEmptyLines: true,
+            complete: function(results) {
+                let headers = results.meta.fields;
+                
+                // Identify the specific columns in the alarm dispatch log
+                let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[0];
+                let dateField = headers.find(h => /date|time/i.test(h)) || headers[1];
+                let notesField = headers.find(h => /note|description|detail|issue/i.test(h)) || headers[2];
+
+                let matchCount = 0;
+                let thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                results.data.forEach(row => {
+                    let rawAddress = extractTextData(row[addressField]).toLowerCase();
+                    if(!rawAddress) return;
+                    
+                    // Basic address cleanup for better matching against leads
+                    let cleanAlarmStreet = rawAddress.replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
+
+                    // Search memory for a lead at this address
+                    let matchedAccount = allAccounts.find(acc => acc.Street_Address.toLowerCase().includes(cleanAlarmStreet) || cleanAlarmStreet.includes(acc.Street_Address.toLowerCase()));
+                    
+                    if (matchedAccount) {
+                        if (!matchedAccount.alarms) matchedAccount.alarms = [];
+                        
+                        let alarmDateStr = extractTextData(row[dateField]);
+                        let alarmNotes = extractTextData(row[notesField]);
+                        
+                        // Check if this exact alarm is already recorded to prevent duplicates
+                        let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
+                        
+                        if (!isDuplicate) {
+                            let isActive = false;
+                            try {
+                                let alarmDateObj = new Date(alarmDateStr);
+                                if (alarmDateObj >= thirtyDaysAgo) isActive = true;
+                            } catch(e) {}
+                            
+                            matchedAccount.alarms.push({
+                                date: alarmDateStr,
+                                notes: alarmNotes,
+                                active: isActive
+                            });
+                            
+                            // If any alarm is active, flag the whole account
+                            if (isActive) matchedAccount.hasActiveAlarm = true;
+                            
+                            matchCount++;
+                        }
+                    }
+                });
+                
+                localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+                filterMap();
+                
+                document.getElementById('loading-overlay').style.display = 'none';
+                alert(`Successfully merged ${matchCount} new alarm records into your existing territory map.`);
+                e.target.value = '';
+            }
+        });
+    });
+
     async function runRealGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
         let processed = 0;
-        
         for (let acc of accounts) {
             if (!acc.lat || !acc.lon) {
                 document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Satellite limit: 1 address per sec.\nPlease keep screen active.)`;
-                
                 try {
-                    // Strip Suite/Apt numbers to prevent Nominatim from falling back to a street centroid 0.3 miles away
                     let queryStreet = String(acc.Street_Address).replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
                     let query = `${queryStreet}, ${acc['City, State, Zip']}`.replace(/^[,\s]+|[,\s]+$/g, '').trim();
-                    
                     let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
                     let data = await response.json();
                     
@@ -449,7 +556,6 @@
                         acc.lat = parseFloat(data[0].lat);
                         acc.lon = parseFloat(data[0].lon);
                     } else {
-                        // Fallback to City Center if strictly necessary
                         let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(acc['City, State, Zip'])}`);
                         let cityData = await cityResponse.json();
                         if (cityData && cityData.length > 0) {
@@ -464,9 +570,8 @@
                     acc.lat = userLat + (Math.random() * 0.05 - 0.025);
                     acc.lon = userLon + (Math.random() * 0.05 - 0.025);
                 }
-                
                 processed++;
-                await new Promise(r => setTimeout(r, 1100)); // Respect OpenStreetMap rate limits
+                await new Promise(r => setTimeout(r, 1100)); 
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
@@ -493,7 +598,7 @@
             id: key, Business_Name: name, Street_Address: street,
             'City, State, Zip': extractTextData(document.getElementById('manual-city').value), 
             Contact_Name: extractTextData(document.getElementById('manual-contact').value), Phone: extractTextData(document.getElementById('manual-phone').value), 
-            visited: false, surveys: [] 
+            visited: false, surveys: [], alarms: []
         }];
 
         let geocodedLead = await runRealGeocoder(newLead);
@@ -510,6 +615,8 @@
     function filterMap() {
         markersLayer.clearLayers(); closeSheet();
         let radius = parseFloat(document.getElementById('radius-slider').value);
+        let showActiveAlarmsOnly = document.getElementById('alarm-filter-toggle').checked;
+        
         let matchCount = 0; let bounds = L.latLngBounds();
 
         allAccounts.forEach(acc => {
@@ -517,7 +624,18 @@
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
             
-            let marker = L.marker([acc.lat, acc.lon], { icon: acc.visited ? visitedIcon : defaultIcon });
+            // Logic to filter strictly by Active Alarms if toggle is ON
+            if (showActiveAlarmsOnly && !acc.hasActiveAlarm) return;
+            
+            // Determine Pin Icon
+            let pinIcon = defaultIcon;
+            if (acc.hasActiveAlarm) {
+                pinIcon = fireIcon; // High priority override
+            } else if (acc.visited) {
+                pinIcon = visitedIcon; // Gray out if visited
+            }
+            
+            let marker = L.marker([acc.lat, acc.lon], { icon: pinIcon });
             marker.on('click', () => showDetails(acc, distance));
             markersLayer.addLayer(marker);
             bounds.extend([acc.lat, acc.lon]);
@@ -543,6 +661,40 @@
         let callBtn = document.getElementById('action-call');
         if (acc.Phone) { callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`; callBtn.style.display = 'flex'; } 
         else { callBtn.style.display = 'none'; }
+        
+        // Render Alarm History in UI
+        let alarmContainer = document.getElementById('alarm-history-container');
+        if (acc.alarms && acc.alarms.length > 0) {
+            alarmContainer.style.display = 'block';
+            document.getElementById('alarm-count-badge').innerText = acc.alarms.length;
+            
+            let listHtml = '';
+            // Sort alarms by date, newest first
+            let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            sortedAlarms.forEach(al => {
+                let badge = al.active ? `<span style="color:#d32f2f; font-weight:bold; font-size:0.75rem; margin-left:8px;">(Last 30 Days)</span>` : '';
+                listHtml += `
+                    <div class="alarm-item">
+                        <strong>${al.date || 'Unknown Date'}</strong> ${badge}
+                        <div style="color: #666; margin-top:2px;">${al.notes || 'No description provided.'}</div>
+                    </div>
+                `;
+            });
+            document.getElementById('alarm-list-content').innerHTML = listHtml;
+            
+            // Highlight the header if there is an active alarm
+            if (acc.hasActiveAlarm) {
+                document.querySelector('.alarm-header').style.background = '#d32f2f';
+                document.getElementById('alarm-count-badge').style.color = '#d32f2f';
+            } else {
+                document.querySelector('.alarm-header').style.background = '#757575';
+                document.getElementById('alarm-count-badge').style.color = '#757575';
+            }
+            
+        } else {
+            alarmContainer.style.display = 'none';
+        }
         
         updateVisitButtonUI();
         document.getElementById('bottom-sheet').classList.add('active');
@@ -781,6 +933,19 @@
 
             pdfHtml += `</div>`;
         });
+
+        // Add standard alarm history to the PDF if it exists
+        if (acc.alarms && acc.alarms.length > 0) {
+            pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ffcdd2; border-radius: 8px;">`;
+            pdfHtml += `<h3 style="margin-top: 0; color: #d32f2f; margin-bottom: 10px;">Alarm Dispatch History</h3>`;
+            pdfHtml += `<ul style="margin-top: 5px; margin-bottom: 5px; font-size: 14px;">`;
+            
+            let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
+            sortedAlarms.forEach(al => {
+                pdfHtml += `<li style="margin-bottom: 6px;"><strong>${al.date || 'Unknown Date'}:</strong> ${al.notes || 'No description provided.'}</li>`;
+            });
+            pdfHtml += `</ul></div>`;
+        }
 
         // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
