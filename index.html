@@ -20,7 +20,6 @@
         
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         
-        /* Header modified to include Fullscreen toggle */
         #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; text-align: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
         #fullscreen-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; cursor: pointer; }
         
@@ -29,7 +28,7 @@
         .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
         label { font-size: 0.85rem; font-weight: bold; color: #555; }
         
-        input[type="file"], input[type="date"] { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        input[type="file"], input[type="date"], input[type="text"], select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
         input[type="range"] { width: 100%; }
         
         #map { flex-grow: 1; width: 100%; z-index: 1; }
@@ -47,13 +46,37 @@
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
         
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .action-btn { padding: 14px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
+        .action-btn { padding: 12px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 0.95rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
         .nav-btn { background: #f57c00; }
         .call-btn { background: #2e7d32; }
-        .email-btn { background: #1565c0; grid-column: span 2; }
+        .survey-btn { background: #673ab7; grid-column: span 2; padding: 16px; font-size: 1.1rem; }
         .visit-btn { background: #757575; grid-column: span 2; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        /* Survey Modal UI */
+        #survey-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f9f9f9; z-index: 3000; display: none; flex-direction: column; }
+        #survey-modal.active { display: flex; }
+        .survey-header { background: #673ab7; color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        .survey-header h3 { margin: 0; font-size: 1.1rem; }
+        .survey-content { flex-grow: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+        
+        .building-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
+        .bldg-header { font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #673ab7; }
+        
+        .counter-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
+        .counter-label { font-weight: 500; font-size: 0.95rem; color: #444; }
+        .counter-controls { display: flex; align-items: center; gap: 8px; }
+        .c-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: #e0e0e0; font-size: 1.2rem; font-weight: bold; color: #333; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+        .c-btn:active { background: #bdbdbd; }
+        .c-input { width: 50px; text-align: center; font-size: 1rem; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; padding: 8px 4px; }
+        
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 10px; }
+        .photo-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #ccc; }
+        
+        .survey-actions { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: flex; gap: 10px; }
+        .btn-add { background: #0288d1; flex: 1; }
+        .btn-email { background: #2e7d32; flex: 1; }
+        
+        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 4000; }
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
@@ -83,17 +106,6 @@
                 <input type="range" id="radius-slider" min="1" max="100" value="25" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
         </div>
-        
-        <div class="row">
-            <div class="control-group" style="flex: 1;">
-                <label>Inspections From</label>
-                <input type="date" id="start-date" onchange="filterMap()">
-            </div>
-            <div class="control-group" style="flex: 1;">
-                <label>To</label>
-                <input type="date" id="end-date" onchange="filterMap()">
-            </div>
-        </div>
     </div>
     
     <div id="map"></div>
@@ -114,60 +126,69 @@
             <span id="sheet-contact">John Doe</span>
         </div>
         <div class="info-item">
-            <strong>Inspection Date</strong>
-            <span id="sheet-date">2026-10-15</span>
+            <strong>Phone</strong>
+            <span id="sheet-phone">N/A</span>
         </div>
     </div>
     
     <div class="actions">
+        <button class="action-btn survey-btn" onclick="openSurvey()">📝 Build Report & Survey</button>
         <a href="#" id="action-nav" class="action-btn nav-btn" target="_blank">🚗 Navigate</a>
         <a href="#" id="action-call" class="action-btn call-btn">📞 Call</a>
-        <a href="#" id="action-email" class="action-btn email-btn">✉️ Email</a>
         <button id="action-visit" class="action-btn visit-btn" onclick="toggleVisit()">✓ Mark Visited</button>
+    </div>
+</div>
+
+<!-- Survey Builder Overlay -->
+<div id="survey-modal">
+    <div class="survey-header">
+        <h3 id="survey-modal-title">Site Survey</h3>
+        <button style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;" onclick="closeSurvey()">×</button>
+    </div>
+    <div class="survey-content" id="survey-content">
+        <!-- Buildings injected here -->
+    </div>
+    <div class="survey-actions">
+        <button class="action-btn btn-add" onclick="addBuilding()">➕ Add Building</button>
+        <button class="action-btn btn-email" onclick="emailReport()">✉️ Email Report</button>
     </div>
 </div>
 
 <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing Data...</div>
+    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing...</div>
 </div>
 
 <script>
-    // Fullscreen Implementation
+    // System Fields Configuration
+    const SURVEY_FIELDS = [
+        { id: 'pullStations', label: 'Pull Stations' },
+        { id: 'hornStrobes', label: 'Horn/Strobes' },
+        { id: 'smokeDetectors', label: 'Smoke Detectors' },
+        { id: 'heatDetectors', label: 'Heat Detectors' },
+        { id: 'speakers', label: 'Speakers' },
+        { id: 'annunciators', label: 'Annunciators' },
+        { id: 'auxPanels', label: 'Aux Power Panels' },
+        { id: 'fireExtinguishers', label: 'Fire Extinguishers' },
+        { id: 'backflows', label: 'Backflows' },
+        { id: 'fireHydrants', label: 'Fire Hydrants' },
+        { id: 'firePumps', label: 'Fire Pumps' },
+        { id: 'sprinklers', label: 'Sprinklers (Wet)' },
+        { id: 'drySprinklers', label: 'Dry Sprinklers' }
+    ];
+
     function toggleFullscreen() {
         let elem = document.documentElement;
-        if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
-            if (elem.requestFullscreen) {
-                elem.requestFullscreen();
-            } else if (elem.msRequestFullscreen) {
-                elem.msRequestFullscreen();
-            } else if (elem.mozRequestFullScreen) {
-                elem.mozRequestFullScreen();
-            } else if (elem.webkitRequestFullscreen) {
-                elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-            }
+        if (!document.fullscreenElement) {
+            if (elem.requestFullscreen) elem.requestFullscreen();
+            else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
             document.getElementById('fullscreen-btn').innerText = '✖ Exit Fullscreen';
         } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            }
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
             document.getElementById('fullscreen-btn').innerText = '⛶ Fullscreen';
         }
     }
-
-    // Auto-attempt fullscreen on load if possible (browsers often block this without user interaction first)
-    document.addEventListener("DOMContentLoaded", function() {
-        if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
-            // Hide the button if already running as a true native PWA
-            document.getElementById('fullscreen-btn').style.display = 'none';
-        }
-    });
 
     let map;
     let markersLayer = L.layerGroup();
@@ -180,43 +201,22 @@
     const visitedIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
+        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
 
     function initMap() {
         map = L.map('map').setView([userLat, userLon], 10);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         markersLayer.addTo(map);
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
-                userLat = pos.coords.latitude;
-                userLon = pos.coords.longitude;
+                userLat = pos.coords.latitude; userLon = pos.coords.longitude;
                 map.setView([userLat, userLon], 11);
-                
-                L.circleMarker([userLat, userLon], {
-                    radius: 8,
-                    fillColor: "#2196F3",
-                    color: "#fff",
-                    weight: 2,
-                    opacity: 1,
-                    fillOpacity: 1
-                }).addTo(map).bindPopup("<b>Your Current Location</b>");
-                
+                L.circleMarker([userLat, userLon], { radius: 8, fillColor: "#2196F3", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(map);
                 loadSavedAccounts();
-            }, err => {
-                alert("Location access denied. Defaulting to Central Texas.");
-                loadSavedAccounts();
-            });
-        } else {
-            loadSavedAccounts();
-        }
+            }, err => { loadSavedAccounts(); });
+        } else { loadSavedAccounts(); }
     }
 
     function loadSavedAccounts() {
@@ -235,8 +235,7 @@
 
     function clearData() {
         localStorage.removeItem('firetrackr_accounts');
-        allAccounts = [];
-        markersLayer.clearLayers();
+        allAccounts = []; markersLayer.clearLayers();
         document.getElementById('upload-group').style.display = 'flex';
         document.getElementById('data-status-container').style.display = 'none';
         document.getElementById('csv-file').value = '';
@@ -245,12 +244,8 @@
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 3958.8;
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const R = 3958.8; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c;
     }
@@ -260,8 +255,7 @@
         if (!file) return;
         
         Papa.parse(file, {
-            header: true,
-            skipEmptyLines: true,
+            header: true, skipEmptyLines: true,
             complete: async function(results) {
                 let validRecords = new Map();
                 let headers = results.meta.fields;
@@ -271,47 +265,27 @@
                 let cityStateField = headers.find(h => /city|state|zip/i.test(h)) || headers[2];
                 let contactField = headers.find(h => /contact|first|last/i.test(h)) || headers[3];
                 let phoneField = headers.find(h => /phone|mobile/i.test(h)) || headers[4];
-                let emailField = headers.find(h => /email/i.test(h)) || headers[5];
-                let dateField = headers.find(h => /date|inspection/i.test(h)) || headers[6];
 
                 results.data.forEach(row => {
-                    let bizName = row[nameField];
-                    let street = row[addressField];
-                    
+                    let bizName = row[nameField]; let street = row[addressField];
                     if (bizName && street) {
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
                         if (!validRecords.has(key)) {
-                            let formattedRow = {
-                                id: key,
-                                Business_Name: bizName,
-                                Street_Address: street,
-                                'City, State, Zip': row[cityStateField] || '',
-                                Contact_Name: row[contactField] || '',
-                                Phone: row[phoneField] || '',
-                                Email: row[emailField] || '',
-                                Inspection_Date: row[dateField] || '',
-                                visited: false
-                            };
-                            validRecords.set(key, formattedRow);
+                            validRecords.set(key, {
+                                id: key, Business_Name: bizName, Street_Address: street,
+                                'City, State, Zip': row[cityStateField] || '', Contact_Name: row[contactField] || '',
+                                Phone: row[phoneField] || '', visited: false, surveys: [] // Initialize empty surveys array
+                            });
                         }
                     }
                 });
                 
                 let uniqueAccounts = Array.from(validRecords.values());
-                
-                if (uniqueAccounts.length === 0) {
-                    alert("Could not detect Name and Address columns. Found headers: " + headers.join(", "));
-                    return;
-                }
+                if (uniqueAccounts.length === 0) { alert("Could not detect Name and Address columns."); return; }
                 
                 allAccounts = await runMockGeocoder(uniqueAccounts);
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-                
-                document.getElementById('upload-group').style.display = 'none';
-                document.getElementById('data-status-container').style.display = 'block';
-                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
-                
-                filterMap();
+                loadSavedAccounts();
                 e.target.value = '';
             }
         });
@@ -320,90 +294,48 @@
     async function runMockGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
         document.getElementById('loading-text').innerText = `Geocoding ${accounts.length} accounts...`;
-        
         await new Promise(resolve => setTimeout(resolve, 1500));
-        
         accounts.forEach(acc => {
-            const radius = (Math.random() * 30) / 69; 
-            const angle = Math.random() * Math.PI * 2;
-            acc.lat = userLat + (radius * Math.cos(angle));
-            acc.lon = userLon + (radius * Math.sin(angle));
+            const radius = (Math.random() * 30) / 69; const angle = Math.random() * Math.PI * 2;
+            acc.lat = userLat + (radius * Math.cos(angle)); acc.lon = userLon + (radius * Math.sin(angle));
         });
-        
         document.getElementById('loading-overlay').style.display = 'none';
         return accounts;
     }
 
     function filterMap() {
-        markersLayer.clearLayers();
-        closeSheet();
-        
+        markersLayer.clearLayers(); closeSheet();
         let radius = parseFloat(document.getElementById('radius-slider').value);
-        let startDate = document.getElementById('start-date').value;
-        let endDate = document.getElementById('end-date').value;
-        
-        let matchCount = 0;
-        let bounds = L.latLngBounds();
+        let matchCount = 0; let bounds = L.latLngBounds();
 
         allAccounts.forEach(acc => {
             if (!acc.lat || !acc.lon) return;
-            
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
             
-            if (startDate && acc.Inspection_Date < startDate) return;
-            if (endDate && acc.Inspection_Date > endDate) return;
-            
-            let marker = L.marker([acc.lat, acc.lon], {
-                icon: acc.visited ? visitedIcon : defaultIcon
-            });
-            
+            let marker = L.marker([acc.lat, acc.lon], { icon: acc.visited ? visitedIcon : defaultIcon });
             marker.on('click', () => showDetails(acc, distance));
             markersLayer.addLayer(marker);
-            
             bounds.extend([acc.lat, acc.lon]);
             matchCount++;
         });
 
-        if (matchCount > 0) {
-            map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-        } else {
-            map.setView([userLat, userLon], 10);
-        }
+        if (matchCount > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+        else map.setView([userLat, userLon], 10);
     }
 
     function showDetails(acc, distance) {
         currentSelectedAccount = acc;
-        
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
         document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
-        
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
-        document.getElementById('sheet-date').innerText = acc.Inspection_Date || 'N/A';
+        document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
         
-        let navBtn = document.getElementById('action-nav');
+        document.getElementById('action-nav').href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
+        
         let callBtn = document.getElementById('action-call');
-        let emailBtn = document.getElementById('action-email');
-        
-        navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
-        
-        if (acc.Phone) {
-            callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`;
-            callBtn.style.display = 'flex';
-        } else {
-            callBtn.style.display = 'none';
-        }
-        
-        if (acc.Email) {
-            let subject = encodeURIComponent(`Firetrol Life Safety Services: ${acc.Business_Name}`);
-            let signature = `\n\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
-            let body = encodeURIComponent(`Hello ${acc.Contact_Name || ''},\n\nI am reaching out regarding the fire and life safety inspections at ${acc.Business_Name}.${signature}`);
-            
-            emailBtn.href = `mailto:${acc.Email}?subject=${subject}&body=${body}`;
-            emailBtn.style.display = 'flex';
-        } else {
-            emailBtn.style.display = 'none';
-        }
+        if (acc.Phone) { callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`; callBtn.style.display = 'flex'; } 
+        else { callBtn.style.display = 'none'; }
         
         updateVisitButtonUI();
         document.getElementById('bottom-sheet').classList.add('active');
@@ -411,33 +343,218 @@
 
     function toggleVisit() {
         if (!currentSelectedAccount) return;
-        
         currentSelectedAccount.visited = !currentSelectedAccount.visited;
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-        
-        updateVisitButtonUI();
-        filterMap();
-        
+        updateVisitButtonUI(); filterMap();
         let distance = calculateDistance(userLat, userLon, currentSelectedAccount.lat, currentSelectedAccount.lon);
         showDetails(currentSelectedAccount, distance);
     }
     
     function updateVisitButtonUI() {
         let visitBtn = document.getElementById('action-visit');
-        if (currentSelectedAccount.visited) {
-            visitBtn.innerText = "↩ Undo Visit";
-            visitBtn.style.background = "#e0e0e0";
-            visitBtn.style.color = "#333";
-        } else {
-            visitBtn.innerText = "✓ Mark Visited";
-            visitBtn.style.background = "#757575";
-            visitBtn.style.color = "white";
+        if (currentSelectedAccount.visited) { visitBtn.innerText = "↩ Undo Visit"; visitBtn.style.background = "#e0e0e0"; visitBtn.style.color = "#333"; } 
+        else { visitBtn.innerText = "✓ Mark Visited"; visitBtn.style.background = "#757575"; visitBtn.style.color = "white"; }
+    }
+
+    function closeSheet() { document.getElementById('bottom-sheet').classList.remove('active'); currentSelectedAccount = null; }
+
+    /* =========================================
+       SURVEY BUILDER & REPORT LOGIC
+       ========================================= */
+
+    function openSurvey() {
+        if(!currentSelectedAccount) return;
+        document.getElementById('survey-modal-title').innerText = `Survey: ${currentSelectedAccount.Business_Name}`;
+        
+        // Initialize survey array if missing
+        if(!currentSelectedAccount.surveys || currentSelectedAccount.surveys.length === 0) {
+            currentSelectedAccount.surveys = [createNewBuilding('Building 1')];
+        }
+        
+        renderSurveys();
+        document.getElementById('survey-modal').classList.add('active');
+    }
+
+    function closeSurvey() {
+        document.getElementById('survey-modal').classList.remove('active');
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+    }
+
+    function createNewBuilding(name) {
+        let bldg = { id: Date.now().toString(), name: name, inspectionDue: '', panel: '', dialer: '', photos: [], counts: {} };
+        SURVEY_FIELDS.forEach(f => bldg.counts[f.id] = 0);
+        return bldg;
+    }
+
+    function addBuilding() {
+        let nextNum = currentSelectedAccount.surveys.length + 1;
+        currentSelectedAccount.surveys.push(createNewBuilding(`Building ${nextNum}`));
+        renderSurveys();
+        saveSurveyState();
+    }
+
+    function saveSurveyState() {
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+    }
+
+    // Handles the UI updating for counter clicks
+    function updateCount(bldgId, fieldId, change) {
+        let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
+        if(bldg) {
+            let current = parseInt(bldg.counts[fieldId]) || 0;
+            let newVal = current + change;
+            if(newVal < 0) newVal = 0;
+            bldg.counts[fieldId] = newVal;
+            document.getElementById(`count-${bldgId}-${fieldId}`).value = newVal;
+            saveSurveyState();
         }
     }
 
-    function closeSheet() {
-        document.getElementById('bottom-sheet').classList.remove('active');
-        currentSelectedAccount = null;
+    // Handles direct manual typing into the counter box
+    function setManualCount(bldgId, fieldId, value) {
+        let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
+        if(bldg) {
+            let newVal = parseInt(value) || 0;
+            if(newVal < 0) newVal = 0;
+            bldg.counts[fieldId] = newVal;
+            saveSurveyState();
+        }
+    }
+
+    function updateTextField(bldgId, field, value) {
+        let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
+        if(bldg) { bldg[field] = value; saveSurveyState(); }
+    }
+
+    // Memory-Safe Image Compression. Converts 5MB native photos into tiny thumbnails for Local Storage
+    function handlePhotoUpload(event, bldgId) {
+        const files = event.target.files;
+        if (!files.length) return;
+        
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('loading-text').innerText = "Processing Photo...";
+        
+        let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
+
+        Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 500; // Aggressive downscale for PWA limits
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Compress to highly efficient JPEG
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                    bldg.photos.push(dataUrl);
+                    saveSurveyState();
+                    renderSurveys();
+                    document.getElementById('loading-overlay').style.display = 'none';
+                }
+                img.src = e.target.result;
+            }
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function renderSurveys() {
+        const container = document.getElementById('survey-content');
+        container.innerHTML = '';
+        
+        currentSelectedAccount.surveys.forEach((bldg, index) => {
+            let html = `
+                <div class="building-card">
+                    <div class="bldg-header">
+                        <input type="text" value="${bldg.name}" onchange="updateTextField('${bldg.id}', 'name', this.value)" style="font-size:1.1rem; font-weight:bold; border:none; border-bottom:1px solid #ccc; padding:4px;" placeholder="Building Name">
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom:12px;">
+                        <label>Inspection Due Date</label>
+                        <input type="date" value="${bldg.inspectionDue || ''}" onchange="updateTextField('${bldg.id}', 'inspectionDue', this.value)">
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom:12px;">
+                        <label>Fire Panel Model</label>
+                        <input type="text" placeholder="e.g. Potter P400 FACP" value="${bldg.panel || ''}" onchange="updateTextField('${bldg.id}', 'panel', this.value)">
+                    </div>
+                    
+                    <div class="control-group" style="margin-bottom:15px;">
+                        <label>Communicator Type</label>
+                        <select onchange="updateTextField('${bldg.id}', 'dialer', this.value)">
+                            <option value="" ${!bldg.dialer ? 'selected' : ''}>Select...</option>
+                            <option value="Cellular" ${bldg.dialer==='Cellular' ? 'selected' : ''}>Cellular</option>
+                            <option value="POTS" ${bldg.dialer==='POTS' ? 'selected' : ''}>POTS (Phone Lines)</option>
+                            <option value="Both" ${bldg.dialer==='Both' ? 'selected' : ''}>Both</option>
+                        </select>
+                    </div>
+                    
+                    <div style="background:#f5f5f5; padding:10px; border-radius:6px; margin-bottom:15px;">
+                        <label style="display:block; margin-bottom:10px; font-size:0.95rem;">📸 Asset Photos</label>
+                        <input type="file" accept="image/*" multiple onchange="handlePhotoUpload(event, '${bldg.id}')" style="margin-bottom:10px;">
+                        <div class="photo-grid">
+                            ${bldg.photos.map(p => `<img src="${p}" class="photo-thumb">`).join('')}
+                        </div>
+                    </div>
+                    
+                    <label style="display:block; margin-top:20px; margin-bottom:5px; border-bottom:2px solid #ccc; padding-bottom:5px;">Asset Quantities</label>
+            `;
+            
+            SURVEY_FIELDS.forEach(field => {
+                let count = bldg.counts[field.id] || 0;
+                html += `
+                    <div class="counter-row">
+                        <div class="counter-label">${field.label}</div>
+                        <div class="counter-controls">
+                            <button class="c-btn" onclick="updateCount('${bldg.id}', '${field.id}', -1)">-</button>
+                            <input type="number" class="c-input" id="count-${bldg.id}-${field.id}" value="${count}" onchange="setManualCount('${bldg.id}', '${field.id}', this.value)">
+                            <button class="c-btn" onclick="updateCount('${bldg.id}', '${field.id}', 1)">+</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += `</div>`;
+            container.innerHTML += html;
+        });
+    }
+
+    // Export formatting designed to match internal dispatch requirements exactly
+    function emailReport() {
+        let acc = currentSelectedAccount;
+        let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
+        
+        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${acc['City, State, Zip']}\n\n`;
+
+        acc.surveys.forEach(bldg => {
+            let panelStr = bldg.panel ? `[${bldg.panel}]` : '';
+            body += `Test the fire alarm devices at ${bldg.name} ${panelStr}\n`;
+            if (bldg.inspectionDue) body += `Inspection Due: ${bldg.inspectionDue}\n`;
+            if (bldg.dialer) body += `Communicator: ${bldg.dialer}\n`;
+            
+            body += `\nDevice Inventory to Test (Estimated Totals):\n`;
+            let hasDevices = false;
+            
+            SURVEY_FIELDS.forEach(f => {
+                if (bldg.counts[f.id] > 0) {
+                    body += `- ${bldg.counts[f.id]} ${f.label}\n`;
+                    hasDevices = true;
+                }
+            });
+            
+            if(!hasDevices) body += `- No devices quantified.\n`;
+            body += `\n=================================\n\n`;
+        });
+        
+        // Exact Corporate Signature requirement
+        body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
+        
+        window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
     }
 
     window.onload = initMap;
