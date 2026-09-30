@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#d32f2f">
     <link rel="manifest" href='data:application/manifest+json,{"name":"Firetrackr","short_name":"Firetrackr","display":"standalone","start_url":"."}'>
     <title>Firetrackr</title>
@@ -17,7 +19,10 @@
         body, html { margin: 0; padding: 0; height: 100%; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); overflow: hidden; }
         
         #app-container { display: flex; flex-direction: column; height: 100vh; }
-        #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; text-align: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; }
+        
+        /* Header modified to include Fullscreen toggle */
+        #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; text-align: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
+        #fullscreen-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; cursor: pointer; }
         
         #controls { padding: 10px; background: white; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 12px; }
         .control-group { display: flex; flex-direction: column; gap: 4px; }
@@ -41,7 +46,6 @@
         .info-item { font-size: 0.85rem; color: #555; }
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
         
-        /* Updated Actions Grid */
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
         .action-btn { padding: 14px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
         .nav-btn { background: #f57c00; }
@@ -57,7 +61,10 @@
 <body>
 
 <div id="app-container">
-    <div id="header">Firetrackr</div>
+    <div id="header">
+        <span>Firetrackr</span>
+        <button id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
+    </div>
     
     <div id="controls">
         <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9;">
@@ -126,6 +133,42 @@
 </div>
 
 <script>
+    // Fullscreen Implementation
+    function toggleFullscreen() {
+        let elem = document.documentElement;
+        if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+            if (elem.requestFullscreen) {
+                elem.requestFullscreen();
+            } else if (elem.msRequestFullscreen) {
+                elem.msRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                elem.mozRequestFullScreen();
+            } else if (elem.webkitRequestFullscreen) {
+                elem.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
+            }
+            document.getElementById('fullscreen-btn').innerText = '✖ Exit Fullscreen';
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
+            document.getElementById('fullscreen-btn').innerText = '⛶ Fullscreen';
+        }
+    }
+
+    // Auto-attempt fullscreen on load if possible (browsers often block this without user interaction first)
+    document.addEventListener("DOMContentLoaded", function() {
+        if (window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches) {
+            // Hide the button if already running as a true native PWA
+            document.getElementById('fullscreen-btn').style.display = 'none';
+        }
+    });
+
     let map;
     let markersLayer = L.layerGroup();
     let allAccounts = [];
@@ -133,7 +176,6 @@
     let userLon = -97.7431;
     let currentSelectedAccount = null;
 
-    // Custom Icon for Visited Locations
     const defaultIcon = new L.Icon.Default();
     const visitedIcon = new L.Icon({
         iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
@@ -240,7 +282,7 @@
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
                         if (!validRecords.has(key)) {
                             let formattedRow = {
-                                id: key, // Create unique ID for state tracking
+                                id: key,
                                 Business_Name: bizName,
                                 Street_Address: street,
                                 'City, State, Zip': row[cityStateField] || '',
@@ -248,7 +290,7 @@
                                 Phone: row[phoneField] || '',
                                 Email: row[emailField] || '',
                                 Inspection_Date: row[dateField] || '',
-                                visited: false // Default new accounts to unvisited
+                                visited: false
                             };
                             validRecords.set(key, formattedRow);
                         }
@@ -312,7 +354,6 @@
             if (startDate && acc.Inspection_Date < startDate) return;
             if (endDate && acc.Inspection_Date > endDate) return;
             
-            // Render Gray if visited, default Blue if not
             let marker = L.marker([acc.lat, acc.lon], {
                 icon: acc.visited ? visitedIcon : defaultIcon
             });
@@ -343,12 +384,9 @@
         let navBtn = document.getElementById('action-nav');
         let callBtn = document.getElementById('action-call');
         let emailBtn = document.getElementById('action-email');
-        let visitBtn = document.getElementById('action-visit');
         
-        // Navigation Button
         navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
         
-        // Call Button
         if (acc.Phone) {
             callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`;
             callBtn.style.display = 'flex';
@@ -356,7 +394,6 @@
             callBtn.style.display = 'none';
         }
         
-        // Email Button with required corporate signature
         if (acc.Email) {
             let subject = encodeURIComponent(`Firetrol Life Safety Services: ${acc.Business_Name}`);
             let signature = `\n\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
@@ -368,28 +405,19 @@
             emailBtn.style.display = 'none';
         }
         
-        // Visit Toggle Status
         updateVisitButtonUI();
-        
         document.getElementById('bottom-sheet').classList.add('active');
     }
 
     function toggleVisit() {
         if (!currentSelectedAccount) return;
         
-        // Toggle state in the main array
         currentSelectedAccount.visited = !currentSelectedAccount.visited;
-        
-        // Save the updated array to local storage
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
         
-        // Update the button UI
         updateVisitButtonUI();
-        
-        // Re-render the map to change the pin color instantly
         filterMap();
         
-        // Re-open the sheet since filterMap() closes it automatically
         let distance = calculateDistance(userLat, userLon, currentSelectedAccount.lat, currentSelectedAccount.lon);
         showDetails(currentSelectedAccount, distance);
     }
