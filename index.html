@@ -59,7 +59,6 @@
         .survey-header h3 { margin: 0; font-size: 1.1rem; }
         .survey-content { flex-grow: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
         
-        /* Add Manual Lead Modal */
         #manual-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 4000; display: none; justify-content: center; align-items: center; padding: 20px; }
         #manual-modal.active { display: flex; }
         .manual-card { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
@@ -121,7 +120,6 @@
         <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9; margin-bottom: 5px;">
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
             <div style="display: flex; gap: 8px;">
-                <!-- Updated Add New Export button logic -->
                 <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Add/Update Export</button>
                 <button onclick="openManualModal()" style="flex: 1; padding: 12px; background: #f57c00; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">➕ Add Manual Lead</button>
             </div>
@@ -144,7 +142,6 @@
     <div id="map"></div>
 </div>
 
-<!-- Manual Entry Modal -->
 <div id="manual-modal">
     <div class="manual-card">
         <h3>Add Manual Lead</h3>
@@ -317,9 +314,6 @@
         return R * c;
     }
 
-    /* =========================================
-       THE UPSERT ENGINE (Update + Insert)
-       ========================================= */
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -341,26 +335,34 @@
                     let bizName = row[nameField]; let street = row[addressField];
                     if (bizName && street) {
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
-                        
-                        // Check if this account already exists in memory
                         let existingIndex = allAccounts.findIndex(acc => acc.id === key);
                         
+                        // Extracting city state zip safely without pulling random strings
+                        let extractedCityStateZip = '';
+                        if (row[cityStateField]) {
+                             extractedCityStateZip = String(row[cityStateField]).trim();
+                        } else {
+                             // Fallback manual check for common dynamic export variables
+                             let fallbacks = [row['City, State, Zip'], row.City, row.city];
+                             for(let f of fallbacks) {
+                                 if (f && String(f).length > 2) { extractedCityStateZip = String(f); break; }
+                             }
+                        }
+                        
                         if (existingIndex >= 0) {
-                            // UPDATE EXISTING: Overwrite contact info, preserve surveys/photos/visit status
                             allAccounts[existingIndex].Contact_Name = row[contactField] || allAccounts[existingIndex].Contact_Name;
                             allAccounts[existingIndex].Phone = row[phoneField] || allAccounts[existingIndex].Phone;
+                            allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
                         } else {
-                            // INSERT NEW: Prepare it for the mock geocoder
                             newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
-                                'City, State, Zip': row[cityStateField] || '', Contact_Name: row[contactField] || '',
+                                'City, State, Zip': extractedCityStateZip, Contact_Name: row[contactField] || '',
                                 Phone: row[phoneField] || '', visited: false, surveys: [] 
                             });
                         }
                     }
                 });
                 
-                // If there are brand new accounts, geocode them and merge them into the master list
                 if (newOrUpdatedAccounts.length > 0) {
                     let geocodedNew = await runMockGeocoder(newOrUpdatedAccounts);
                     allAccounts = allAccounts.concat(geocodedNew);
@@ -392,53 +394,30 @@
         return accounts;
     }
 
-    /* =========================================
-       MANUAL LEAD ENTRY LOGIC
-       ========================================= */
-    function openManualModal() {
-        document.getElementById('manual-modal').classList.add('active');
-    }
+    function openManualModal() { document.getElementById('manual-modal').classList.add('active'); }
 
     function closeManualModal() {
         document.getElementById('manual-modal').classList.remove('active');
-        document.getElementById('manual-name').value = '';
-        document.getElementById('manual-street').value = '';
-        document.getElementById('manual-city').value = '';
-        document.getElementById('manual-contact').value = '';
-        document.getElementById('manual-phone').value = '';
+        document.getElementById('manual-name').value = ''; document.getElementById('manual-street').value = '';
+        document.getElementById('manual-city').value = ''; document.getElementById('manual-contact').value = ''; document.getElementById('manual-phone').value = '';
     }
 
     async function saveManualLead() {
         let name = document.getElementById('manual-name').value;
         let street = document.getElementById('manual-street').value;
-        
-        if(!name || !street) {
-            alert("Business Name and Street Address are required.");
-            return;
-        }
+        if(!name || !street) { alert("Business Name and Street Address are required."); return; }
 
         let key = `${String(name).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
-        
-        if (allAccounts.findIndex(acc => acc.id === key) >= 0) {
-            alert("This account already exists in your list.");
-            return;
-        }
+        if (allAccounts.findIndex(acc => acc.id === key) >= 0) { alert("This account already exists in your list."); return; }
 
         let newLead = [{
-            id: key, 
-            Business_Name: name, 
-            Street_Address: street,
+            id: key, Business_Name: name, Street_Address: street,
             'City, State, Zip': document.getElementById('manual-city').value, 
-            Contact_Name: document.getElementById('manual-contact').value,
-            Phone: document.getElementById('manual-phone').value, 
-            visited: false, 
-            surveys: [] 
+            Contact_Name: document.getElementById('manual-contact').value, Phone: document.getElementById('manual-phone').value, 
+            visited: false, surveys: [] 
         }];
 
-        // Geocode the single manual lead
         let geocodedLead = await runMockGeocoder(newLead);
-        
-        // Push to master list and save
         allAccounts.push(geocodedLead[0]);
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
         
@@ -446,8 +425,7 @@
         document.getElementById('data-status-container').style.display = 'block';
         document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
         
-        closeManualModal();
-        filterMap();
+        closeManualModal(); filterMap();
     }
 
     function filterMap() {
@@ -474,7 +452,12 @@
     function showDetails(acc, distance) {
         currentSelectedAccount = acc;
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
-        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
+        
+        // Use clean fallback string handling for UI address 
+        let cityStateZipDisplay = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
+                                  ? acc['City, State, Zip'] : '';
+                                  
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cityStateZipDisplay} (${distance.toFixed(1)} mi)`;
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
         
@@ -527,18 +510,7 @@
     }
 
     function createNewBuilding(name) {
-        let bldg = { 
-            id: Date.now().toString(), 
-            name: name, 
-            inspectionDue: '', 
-            panel: '', 
-            dialer: '', 
-            hasTags: '', 
-            notes: '', 
-            photos: [], 
-            tagPhotos: [], 
-            counts: {} 
-        };
+        let bldg = { id: Date.now().toString(), name: name, inspectionDue: '', panel: '', dialer: '', hasTags: '', notes: '', photos: [], tagPhotos: [], counts: {} };
         SURVEY_FIELDS.forEach(f => bldg.counts[f.id] = 0);
         return bldg;
     }
@@ -550,16 +522,13 @@
         saveSurveyState();
     }
 
-    function saveSurveyState() {
-        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-    }
+    function saveSurveyState() { localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts)); }
 
     function updateCount(bldgId, fieldId, change) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
         if(bldg) {
             let current = parseInt(bldg.counts[fieldId]) || 0;
-            let newVal = current + change;
-            if(newVal < 0) newVal = 0;
+            let newVal = current + change; if(newVal < 0) newVal = 0;
             bldg.counts[fieldId] = newVal;
             document.getElementById(`count-${bldgId}-${fieldId}`).value = newVal;
             saveSurveyState();
@@ -569,8 +538,7 @@
     function setManualCount(bldgId, fieldId, value) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
         if(bldg) {
-            let newVal = parseInt(value) || 0;
-            if(newVal < 0) newVal = 0;
+            let newVal = parseInt(value) || 0; if(newVal < 0) newVal = 0;
             bldg.counts[fieldId] = newVal;
             saveSurveyState();
         }
@@ -596,11 +564,8 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 500; 
-                    const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scaleSize;
-                    
+                    const MAX_WIDTH = 500; const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
@@ -608,8 +573,7 @@
                     if (!bldg[targetArray]) bldg[targetArray] = [];
                     bldg[targetArray].push(dataUrl);
                     
-                    saveSurveyState();
-                    renderSurveys();
+                    saveSurveyState(); renderSurveys();
                     document.getElementById('loading-overlay').style.display = 'none';
                 }
                 img.src = e.target.result;
@@ -628,17 +592,14 @@
                     <div class="bldg-header">
                         <input type="text" value="${bldg.name}" onchange="updateTextField('${bldg.id}', 'name', this.value)" style="font-size:1.1rem; font-weight:bold; border:none; border-bottom:1px solid #ccc; padding:4px;" placeholder="Building Name">
                     </div>
-                    
                     <div class="control-group" style="margin-bottom:12px;">
                         <label>Inspection Due Date</label>
                         <input type="date" value="${bldg.inspectionDue || ''}" onchange="updateTextField('${bldg.id}', 'inspectionDue', this.value)">
                     </div>
-                    
                     <div class="control-group" style="margin-bottom:12px;">
                         <label>Fire Panel Model</label>
                         <input type="text" placeholder="e.g. Potter P400 FACP" value="${bldg.panel || ''}" onchange="updateTextField('${bldg.id}', 'panel', this.value)">
                     </div>
-                    
                     <div class="control-group" style="margin-bottom:15px;">
                         <label>Communicator Type</label>
                         <select onchange="updateTextField('${bldg.id}', 'dialer', this.value)">
@@ -648,15 +609,11 @@
                             <option value="Unknown" ${bldg.dialer==='Unknown' ? 'selected' : ''}>Unknown</option>
                         </select>
                     </div>
-                    
                     <div style="background:#f5f5f5; padding:10px; border-radius:6px; margin-bottom:15px;">
                         <label style="display:block; margin-bottom:10px; font-size:0.95rem;">📸 Asset Photos</label>
                         <input type="file" accept="image/*" multiple onchange="handlePhotoUpload(event, '${bldg.id}', 'photos')" style="margin-bottom:10px;">
-                        <div class="photo-grid">
-                            ${(bldg.photos || []).map(p => `<img src="${p}" class="photo-thumb">`).join('')}
-                        </div>
+                        <div class="photo-grid">${(bldg.photos || []).map(p => `<img src="${p}" class="photo-thumb">`).join('')}</div>
                     </div>
-                    
                     <label style="display:block; margin-top:20px; margin-bottom:5px; border-bottom:2px solid #ccc; padding-bottom:5px;">Asset Quantities</label>
             `;
             
@@ -683,13 +640,9 @@
                             <option value="Red Tag" ${bldg.hasTags==='Red Tag' ? 'selected' : ''}>Yes - Red Tag</option>
                             <option value="Yellow Tag" ${bldg.hasTags==='Yellow Tag' ? 'selected' : ''}>Yes - Yellow Tag</option>
                         </select>
-                        
                         <label>Deficiency Photos</label>
                         <input type="file" accept="image/*" multiple onchange="handlePhotoUpload(event, '${bldg.id}', 'tagPhotos')" style="margin-bottom:12px;">
-                        <div class="photo-grid" style="margin-bottom:12px;">
-                            ${(bldg.tagPhotos || []).map(p => `<img src="${p}" class="photo-thumb">`).join('')}
-                        </div>
-                        
+                        <div class="photo-grid" style="margin-bottom:12px;">${(bldg.tagPhotos || []).map(p => `<img src="${p}" class="photo-thumb">`).join('')}</div>
                         <label>Additional Notes / Missing Information</label>
                         <textarea placeholder="List any access issues, missing information, or unusual site conditions..." onchange="updateTextField('${bldg.id}', 'notes', this.value)">${bldg.notes || ''}</textarea>
                     </div>
@@ -705,9 +658,13 @@
         
         let acc = currentSelectedAccount;
         
+        // Clean City State Zip handling
+        let cleanCityState = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
+                                ? acc['City, State, Zip'] : '';
+        
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
+        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">`;
@@ -751,20 +708,33 @@
             pdfHtml += `</div>`;
         });
 
+        // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        setTimeout(() => { window.print(); }, 300);
+        // This is the psychological trick: Change the browser's hidden window title to the Business Name, 
+        // fire the print command, and then immediately change it back to Firetrackr after the spooler reads it.
+        const originalTitle = document.title;
+        document.title = `${acc.Business_Name} Site Survey`;
+        
+        setTimeout(() => { 
+            window.print(); 
+            // Give the Android spooler 2 seconds to grab the title before reverting
+            setTimeout(() => { document.title = originalTitle; }, 2000);
+        }, 300);
     }
 
     function emailReport() {
         let acc = currentSelectedAccount;
+        let cleanCityState = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
+                                ? acc['City, State, Zip'] : '';
+                                
         let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
         
-        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${acc['City, State, Zip']}\n\n`;
+        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${cleanCityState}\n\n`;
 
         acc.surveys.forEach(bldg => {
             let panelStr = bldg.panel ? `[${bldg.panel}]` : '';
