@@ -10,10 +10,11 @@
     <link rel="manifest" href='data:application/manifest+json,{"name":"Firetrackr","short_name":"Firetrackr","display":"standalone","start_url":"."}'>
     <title>Firetrackr</title>
     
-    <!-- External Libraries -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    
+    <!-- Updated HTML2PDF Library Configuration -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <style>
@@ -84,10 +85,19 @@
         
         #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 4000; }
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
-        
-        /* Hidden PDF Generator Container */
-        #pdf-export-container { position: absolute; left: -9999px; top: 0; width: 800px; background: white; z-index: -1; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Hidden PDF Container with simple, rigid styling to prevent renderer crashes */
+        #pdf-export-container { 
+            position: absolute; 
+            left: -9999px; 
+            top: 0; 
+            width: 800px; 
+            background: white; 
+            z-index: -1; 
+            font-family: Arial, sans-serif;
+            color: #333;
+        }
     </style>
 </head>
 <body>
@@ -570,20 +580,22 @@
         document.getElementById('loading-text').innerText = "Generating PDF...";
         
         let acc = currentSelectedAccount;
-        let pdfHtml = `<div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">`;
-        pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
+        
+        // Use inline-block rendering instead of flex/grid to prevent html2pdf from crashing
+        let pdfHtml = `<div style="padding: 20px;">`;
+        pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
+        pdfHtml += `<p style="margin-bottom: 30px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
 
         acc.surveys.forEach(bldg => {
-            pdfHtml += `<div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid;">`;
-            pdfHtml += `<h3 style="margin-top: 0; color: #673ab7;">${bldg.name}</h3>`;
-            pdfHtml += `<p><strong>Inspection Due:</strong> ${bldg.inspectionDue || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
+            pdfHtml += `<div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid; display: block;">`;
+            pdfHtml += `<h3 style="margin-top: 0; color: #673ab7; margin-bottom: 10px;">${bldg.name}</h3>`;
+            pdfHtml += `<p style="margin-bottom: 15px;"><strong>Inspection Due:</strong> ${bldg.inspectionDue || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
 
-            pdfHtml += `<h4 style="margin-bottom: 5px;">Device Inventory (Estimated Totals):</h4><ul style="margin-top: 5px;">`;
+            pdfHtml += `<h4 style="margin-bottom: 5px;">Device Inventory (Estimated Totals):</h4><ul style="margin-top: 5px; margin-bottom: 15px;">`;
             let hasDevices = false;
             SURVEY_FIELDS.forEach(f => {
                 if (bldg.counts[f.id] > 0) { 
-                    pdfHtml += `<li>${bldg.counts[f.id]} ${f.label}</li>`; 
+                    pdfHtml += `<li style="margin-bottom: 3px;">${bldg.counts[f.id]} ${f.label}</li>`; 
                     hasDevices = true; 
                 }
             });
@@ -591,45 +603,56 @@
             pdfHtml += `</ul>`;
 
             if (bldg.hasTags || bldg.notes) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Notes & Deficiencies:</h4><ul style="margin-top: 5px; color: #d32f2f;">`;
-                if (bldg.hasTags) pdfHtml += `<li><strong>Status:</strong> ${bldg.hasTags}</li>`;
-                if (bldg.notes) pdfHtml += `<li><strong>Notes:</strong> ${bldg.notes}</li>`;
+                pdfHtml += `<h4 style="margin-bottom: 5px;">Notes & Deficiencies:</h4><ul style="margin-top: 5px; color: #d32f2f; margin-bottom: 15px;">`;
+                if (bldg.hasTags) pdfHtml += `<li style="margin-bottom: 3px;"><strong>Status:</strong> ${bldg.hasTags}</li>`;
+                if (bldg.notes) pdfHtml += `<li style="margin-bottom: 3px;"><strong>Notes:</strong> ${bldg.notes}</li>`;
                 pdfHtml += `</ul>`;
             }
 
             if (bldg.photos && bldg.photos.length > 0) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Asset Photos:</h4><div style="display: flex; flex-wrap: wrap; gap: 10px;">`;
-                bldg.photos.forEach(p => { pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 1px solid #ddd;">`; });
+                pdfHtml += `<h4 style="margin-bottom: 5px;">Asset Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
+                bldg.photos.forEach(p => { 
+                    pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
+                });
                 pdfHtml += `</div>`;
             }
 
             if (bldg.tagPhotos && bldg.tagPhotos.length > 0) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Deficiency Photos:</h4><div style="display: flex; flex-wrap: wrap; gap: 10px;">`;
-                bldg.tagPhotos.forEach(p => { pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 2px solid #d32f2f;">`; });
+                pdfHtml += `<h4 style="margin-bottom: 5px;">Deficiency Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
+                bldg.tagPhotos.forEach(p => { 
+                    pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 2px solid #d32f2f; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
+                });
                 pdfHtml += `</div>`;
             }
 
             pdfHtml += `</div>`;
         });
 
-        pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 0.9em; line-height: 1.4;">`;
+        // Exact Corporate Signature requirement
+        pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 0.9em; line-height: 1.4; display: block;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         let container = document.getElementById('pdf-export-container');
         container.innerHTML = pdfHtml;
 
-        let opt = {
-            margin:       0.5,
-            filename:     `Survey_${acc.Business_Name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`,
-            image:        { type: 'jpeg', quality: 0.95 },
-            html2canvas:  { scale: 2, useCORS: true },
-            jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-        };
+        // Give the DOM a moment to physically attach the images before triggering the PDF canvas
+        setTimeout(() => {
+            let opt = {
+                margin:       0.5,
+                filename:     `Survey_${acc.Business_Name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`,
+                image:        { type: 'jpeg', quality: 0.95 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
 
-        html2pdf().set(opt).from(container).save().then(() => {
-            document.getElementById('loading-overlay').style.display = 'none';
-        });
+            html2pdf().set(opt).from(container).save().then(() => {
+                document.getElementById('loading-overlay').style.display = 'none';
+            }).catch(err => {
+                alert("Error generating PDF. Please try again.");
+                document.getElementById('loading-overlay').style.display = 'none';
+            });
+        }, 500);
     }
 
     function emailReport() {
@@ -665,6 +688,7 @@
             body += `\n=================================\n\n`;
         });
         
+        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
