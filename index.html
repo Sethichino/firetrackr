@@ -41,10 +41,13 @@
         .info-item { font-size: 0.85rem; color: #555; }
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
         
-        .actions { display: flex; gap: 10px; }
-        .action-btn { flex: 1; padding: 14px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; }
+        /* Updated Actions Grid */
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .action-btn { padding: 14px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 1rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
+        .nav-btn { background: #f57c00; }
         .call-btn { background: #2e7d32; }
-        .email-btn { background: #1565c0; }
+        .email-btn { background: #1565c0; grid-column: span 2; }
+        .visit-btn { background: #757575; grid-column: span 2; }
         
         #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
@@ -57,7 +60,6 @@
     <div id="header">Firetrackr</div>
     
     <div id="controls">
-        <!-- New Data Status UI -->
         <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9;">
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
             <button onclick="clearData()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">🗑️ Remove & Upload New File</button>
@@ -111,8 +113,10 @@
     </div>
     
     <div class="actions">
+        <a href="#" id="action-nav" class="action-btn nav-btn" target="_blank">🚗 Navigate</a>
         <a href="#" id="action-call" class="action-btn call-btn">📞 Call</a>
         <a href="#" id="action-email" class="action-btn email-btn">✉️ Email</a>
+        <button id="action-visit" class="action-btn visit-btn" onclick="toggleVisit()">✓ Mark Visited</button>
     </div>
 </div>
 
@@ -127,6 +131,18 @@
     let allAccounts = [];
     let userLat = 30.2672; 
     let userLon = -97.7431;
+    let currentSelectedAccount = null;
+
+    // Custom Icon for Visited Locations
+    const defaultIcon = new L.Icon.Default();
+    const visitedIcon = new L.Icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
 
     function initMap() {
         map = L.map('map').setView([userLat, userLon], 10);
@@ -183,6 +199,7 @@
         document.getElementById('data-status-container').style.display = 'none';
         document.getElementById('csv-file').value = '';
         map.setView([userLat, userLon], 10);
+        closeSheet();
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -223,13 +240,15 @@
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
                         if (!validRecords.has(key)) {
                             let formattedRow = {
+                                id: key, // Create unique ID for state tracking
                                 Business_Name: bizName,
                                 Street_Address: street,
                                 'City, State, Zip': row[cityStateField] || '',
                                 Contact_Name: row[contactField] || '',
                                 Phone: row[phoneField] || '',
                                 Email: row[emailField] || '',
-                                Inspection_Date: row[dateField] || ''
+                                Inspection_Date: row[dateField] || '',
+                                visited: false // Default new accounts to unvisited
                             };
                             validRecords.set(key, formattedRow);
                         }
@@ -293,7 +312,11 @@
             if (startDate && acc.Inspection_Date < startDate) return;
             if (endDate && acc.Inspection_Date > endDate) return;
             
-            let marker = L.marker([acc.lat, acc.lon]);
+            // Render Gray if visited, default Blue if not
+            let marker = L.marker([acc.lat, acc.lon], {
+                icon: acc.visited ? visitedIcon : defaultIcon
+            });
+            
             marker.on('click', () => showDetails(acc, distance));
             markersLayer.addLayer(marker);
             
@@ -309,15 +332,23 @@
     }
 
     function showDetails(acc, distance) {
+        currentSelectedAccount = acc;
+        
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
         document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
         
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-date').innerText = acc.Inspection_Date || 'N/A';
         
+        let navBtn = document.getElementById('action-nav');
         let callBtn = document.getElementById('action-call');
         let emailBtn = document.getElementById('action-email');
+        let visitBtn = document.getElementById('action-visit');
         
+        // Navigation Button
+        navBtn.href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
+        
+        // Call Button
         if (acc.Phone) {
             callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`;
             callBtn.style.display = 'flex';
@@ -325,6 +356,7 @@
             callBtn.style.display = 'none';
         }
         
+        // Email Button with required corporate signature
         if (acc.Email) {
             let subject = encodeURIComponent(`Firetrol Life Safety Services: ${acc.Business_Name}`);
             let signature = `\n\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
@@ -336,11 +368,48 @@
             emailBtn.style.display = 'none';
         }
         
+        // Visit Toggle Status
+        updateVisitButtonUI();
+        
         document.getElementById('bottom-sheet').classList.add('active');
+    }
+
+    function toggleVisit() {
+        if (!currentSelectedAccount) return;
+        
+        // Toggle state in the main array
+        currentSelectedAccount.visited = !currentSelectedAccount.visited;
+        
+        // Save the updated array to local storage
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+        
+        // Update the button UI
+        updateVisitButtonUI();
+        
+        // Re-render the map to change the pin color instantly
+        filterMap();
+        
+        // Re-open the sheet since filterMap() closes it automatically
+        let distance = calculateDistance(userLat, userLon, currentSelectedAccount.lat, currentSelectedAccount.lon);
+        showDetails(currentSelectedAccount, distance);
+    }
+    
+    function updateVisitButtonUI() {
+        let visitBtn = document.getElementById('action-visit');
+        if (currentSelectedAccount.visited) {
+            visitBtn.innerText = "↩ Undo Visit";
+            visitBtn.style.background = "#e0e0e0";
+            visitBtn.style.color = "#333";
+        } else {
+            visitBtn.innerText = "✓ Mark Visited";
+            visitBtn.style.background = "#757575";
+            visitBtn.style.color = "white";
+        }
     }
 
     function closeSheet() {
         document.getElementById('bottom-sheet').classList.remove('active');
+        currentSelectedAccount = null;
     }
 
     window.onload = initMap;
