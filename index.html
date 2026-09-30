@@ -314,6 +314,13 @@
         return R * c;
     }
 
+    function parseLocationString(value) {
+        if (!value || typeof value !== 'string') return '';
+        // If the parser accidentally grabbed a literal object string, return empty
+        if (value.includes('[object')) return '';
+        return value.trim();
+    }
+
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -332,20 +339,21 @@
                 let newOrUpdatedAccounts = [];
 
                 results.data.forEach(row => {
-                    let bizName = row[nameField]; let street = row[addressField];
+                    let bizName = parseLocationString(row[nameField]); 
+                    let street = parseLocationString(row[addressField]);
+                    
                     if (bizName && street) {
-                        let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
+                        let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
                         let existingIndex = allAccounts.findIndex(acc => acc.id === key);
                         
-                        // Extracting city state zip safely without pulling random strings
                         let extractedCityStateZip = '';
                         if (row[cityStateField]) {
-                             extractedCityStateZip = String(row[cityStateField]).trim();
+                             extractedCityStateZip = parseLocationString(row[cityStateField]);
                         } else {
-                             // Fallback manual check for common dynamic export variables
                              let fallbacks = [row['City, State, Zip'], row.City, row.city];
                              for(let f of fallbacks) {
-                                 if (f && String(f).length > 2) { extractedCityStateZip = String(f); break; }
+                                 let parsed = parseLocationString(f);
+                                 if (parsed.length > 2) { extractedCityStateZip = parsed; break; }
                              }
                         }
                         
@@ -452,12 +460,7 @@
     function showDetails(acc, distance) {
         currentSelectedAccount = acc;
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
-        
-        // Use clean fallback string handling for UI address 
-        let cityStateZipDisplay = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
-                                  ? acc['City, State, Zip'] : '';
-                                  
-        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cityStateZipDisplay} (${distance.toFixed(1)} mi)`;
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
         
@@ -658,13 +661,9 @@
         
         let acc = currentSelectedAccount;
         
-        // Clean City State Zip handling
-        let cleanCityState = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
-                                ? acc['City, State, Zip'] : '';
-        
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
+        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">`;
@@ -708,33 +707,29 @@
             pdfHtml += `</div>`;
         });
 
-        // Appended Standard Corporate Signature Required by Internal Guidelines
+        // Appended Standard Corporate Signature
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        // This is the psychological trick: Change the browser's hidden window title to the Business Name, 
-        // fire the print command, and then immediately change it back to Firetrackr after the spooler reads it.
+        // Dynamically alter the browser document title to force the native OS to rename the PDF
         const originalTitle = document.title;
         document.title = `${acc.Business_Name} Site Survey`;
         
+        // Delay the print prompt slightly to ensure Android registers the new title, then revert it
         setTimeout(() => { 
             window.print(); 
-            // Give the Android spooler 2 seconds to grab the title before reverting
-            setTimeout(() => { document.title = originalTitle; }, 2000);
-        }, 300);
+            setTimeout(() => { document.title = originalTitle; }, 3000);
+        }, 500);
     }
 
     function emailReport() {
         let acc = currentSelectedAccount;
-        let cleanCityState = acc['City, State, Zip'] && typeof acc['City, State, Zip'] === 'string' && !acc['City, State, Zip'].includes('[object') 
-                                ? acc['City, State, Zip'] : '';
-                                
         let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
         
-        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${cleanCityState}\n\n`;
+        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${acc['City, State, Zip']}\n\n`;
 
         acc.surveys.forEach(bldg => {
             let panelStr = bldg.panel ? `[${bldg.panel}]` : '';
@@ -763,6 +758,7 @@
             body += `\n=================================\n\n`;
         });
         
+        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
