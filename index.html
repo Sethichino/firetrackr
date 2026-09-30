@@ -39,10 +39,11 @@
         .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
         input:checked + .slider { background-color: #d32f2f; }
         input:checked + .slider:before { transform: translateX(20px); }
+        .slider.orange-switch { background-color: #ccc; }
+        input:checked + .slider.orange-switch { background-color: #f57c00; }
         
         #map { flex-grow: 1; width: 100%; z-index: 1; }
         
-        /* Custom Div Icon for the Fire Truck Emoji */
         .custom-div-icon { background: transparent; border: none; }
         
         #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; max-height: 85vh; overflow-y: auto;}
@@ -53,7 +54,7 @@
         .sheet-subtitle { font-size: 0.9rem; color: #666; margin: 4px 0 0 0; }
         .close-btn { background: none; color: #999; font-size: 1.8rem; border: none; padding: 0; line-height: 1; margin-top: -5px; cursor: pointer; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
         .info-item { font-size: 0.85rem; color: #555; }
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
         
@@ -151,12 +152,22 @@
                 <label>Radius: <span id="radius-val">2</span> miles</label>
                 <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
-            
-            <div class="control-group" style="align-items: center; justify-content: center;">
-                <label style="margin-bottom: 4px; color: #d32f2f;">🔥 Active Alarms</label>
+        </div>
+        
+        <!-- NEW: Priority Map Filters -->
+        <div style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px;">
+            <div class="control-group" style="align-items: center;">
+                <label style="margin-bottom: 4px; color: #d32f2f; font-size: 0.8rem; font-weight: bold;">🚒 Alarms (30d)</label>
                 <label class="switch">
                   <input type="checkbox" id="alarm-filter-toggle" onchange="filterMap()">
                   <span class="slider"></span>
+                </label>
+            </div>
+            <div class="control-group" style="align-items: center;">
+                <label style="margin-bottom: 4px; color: #f57c00; font-size: 0.8rem; font-weight: bold;">🔥 Insp Due (90d)</label>
+                <label class="switch">
+                  <input type="checkbox" id="inspection-filter-toggle" onchange="filterMap()">
+                  <span class="slider orange-switch"></span>
                 </label>
             </div>
         </div>
@@ -214,15 +225,22 @@
         </div>
     </div>
     
-    <div class="info-grid">
+    <div class="info-grid" style="margin-bottom: 10px;">
         <div class="info-item">
             <strong>Contact</strong>
             <span id="sheet-contact">John Doe</span>
+            <div id="sheet-job-title" style="font-size: 0.75rem; color: #777; margin-top: 2px;">Manager</div>
         </div>
         <div class="info-item">
             <strong>Phone</strong>
             <span id="sheet-phone">N/A</span>
         </div>
+    </div>
+    
+    <!-- NEW: Displays CRM level Inspection Date on the info card -->
+    <div class="info-item" id="sheet-insp-container" style="margin-bottom: 15px; display: none; background: #fff3e0; padding: 8px; border-radius: 6px; border: 1px solid #ffe0b2;">
+        <strong style="color: #f57c00;">Upcoming Inspection Date (CRM)</strong>
+        <span id="sheet-insp-date">N/A</span>
     </div>
     
     <div class="actions">
@@ -299,12 +317,16 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
     
-    // NEW: Fire Truck Emoji Icon for active alarms!
+    // Icon for Active Alarms (30 Days)
     const fireTruckIcon = L.divIcon({
         html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🚒</div>',
-        className: 'custom-div-icon',
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+    
+    // Icon for Upcoming Inspections (90 Days Rolling)
+    const fireIcon = L.divIcon({
+        html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🔥</div>',
+        className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
     });
 
     function initMap() {
@@ -373,8 +395,28 @@
         if (strVal === 'undefined' || strVal === 'null') return '';
         return strVal;
     }
+    
+    // ROLLING ANNIVERSARY ENGINE: Evaluates any mm/dd/yyyy and checks if its annual anniversary falls within 90 days of today
+    function isWithin90DaysAnnual(dateStr) {
+        if (!dateStr) return false;
+        let d = new Date(dateStr);
+        if (isNaN(d)) return false;
+        
+        let today = new Date();
+        today.setHours(0,0,0,0);
+        
+        // Treat the date as an anniversary for the current year
+        let thisYearAnniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
+        // Calculate next year's anniversary to capture Nov/Dec overlapping into Jan/Feb
+        let nextYearAnniv = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
+        
+        let diffThisYear = (thisYearAnniv - today) / (1000 * 60 * 60 * 24);
+        let diffNextYear = (nextYearAnniv - today) / (1000 * 60 * 60 * 24);
+        
+        return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
+    }
 
-    // LEAD IMPORTER - Now resilient against missing Address columns
+    // LEAD IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -386,11 +428,9 @@
                 
                 let headers = results.meta.fields;
                 
-                // CRITICAL FIX: Explicitly exclude Dynamics CRM's hidden internal columns
                 let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
                 
                 let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
-                
                 let addressField = validHeaders.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || validHeaders.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
                 
                 if (!addressField) {
@@ -400,7 +440,6 @@
                     }
                 }
                 
-                // CRITICAL FIX: If no address field is found, STOP execution and alert the user.
                 if (!addressField) {
                     alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
                     document.getElementById('upload-group').style.display = 'flex';
@@ -414,6 +453,10 @@
                 let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
                 let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name|last name/i.test(h));
                 let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
+                
+                // NEW: Job Title and Inspection Date extractors
+                let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
+                let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
 
                 let newOrUpdatedAccounts = [];
 
@@ -440,14 +483,18 @@
                         
                         if (existingIndex >= 0) {
                             if (contactField) allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
+                            if (titleField) allAccounts[existingIndex].Job_Title = extractTextData(row[titleField]) || allAccounts[existingIndex].Job_Title;
                             if (phoneField) allAccounts[existingIndex].Phone = extractTextData(row[phoneField]) || allAccounts[existingIndex].Phone;
+                            if (dateField) allAccounts[existingIndex].Inspection_Date = extractTextData(row[dateField]) || allAccounts[existingIndex].Inspection_Date;
                             allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
                         } else {
                             newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
                                 'City, State, Zip': extractedCityStateZip, 
                                 Contact_Name: contactField ? extractTextData(row[contactField]) : '',
+                                Job_Title: titleField ? extractTextData(row[titleField]) : '',
                                 Phone: phoneField ? extractTextData(row[phoneField]) : '', 
+                                Inspection_Date: dateField ? extractTextData(row[dateField]) : '',
                                 visited: false, surveys: [], alarms: []
                             });
                         }
@@ -510,7 +557,6 @@
                         
                         let alarmDateStr = extractTextData(row[dateField]);
                         let alarmNotes = extractTextData(row[notesField]);
-                        
                         let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
                         
                         if (!isDuplicate) {
@@ -613,6 +659,7 @@
         markersLayer.clearLayers(); closeSheet();
         let radius = parseFloat(document.getElementById('radius-slider').value);
         let showActiveAlarmsOnly = document.getElementById('alarm-filter-toggle').checked;
+        let showUpcomingInspectionsOnly = document.getElementById('inspection-filter-toggle').checked;
         
         let matchCount = 0; let bounds = L.latLngBounds();
 
@@ -621,11 +668,30 @@
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
             
-            if (showActiveAlarmsOnly && !acc.hasActiveAlarm) return;
+            // Dynamic check for 90-day upcoming inspections based on current date
+            acc.hasUpcomingInspection = false;
+            if (isWithin90DaysAnnual(acc.Inspection_Date)) acc.hasUpcomingInspection = true;
+            if (acc.surveys && acc.surveys.length > 0) {
+                acc.surveys.forEach(bldg => {
+                    if (isWithin90DaysAnnual(bldg.inspectionDue)) acc.hasUpcomingInspection = true;
+                });
+            }
+
+            // Logic to handle the dual filter toggles
+            if (showActiveAlarmsOnly && showUpcomingInspectionsOnly) {
+                if (!acc.hasActiveAlarm && !acc.hasUpcomingInspection) return;
+            } else if (showActiveAlarmsOnly && !acc.hasActiveAlarm) {
+                return;
+            } else if (showUpcomingInspectionsOnly && !acc.hasUpcomingInspection) {
+                return;
+            }
             
+            // Marker Priority: Alarm Truck > Inspection Fire > Visited > Default
             let pinIcon = defaultIcon;
             if (acc.hasActiveAlarm) {
                 pinIcon = fireTruckIcon; 
+            } else if (acc.hasUpcomingInspection) {
+                pinIcon = fireIcon;
             } else if (acc.visited) {
                 pinIcon = visitedIcon;
             }
@@ -650,6 +716,24 @@
         
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
+        
+        // NEW: Job Title UI logic
+        let titleElem = document.getElementById('sheet-job-title');
+        if (acc.Job_Title) {
+            titleElem.style.display = 'block';
+            titleElem.innerText = acc.Job_Title;
+        } else {
+            titleElem.style.display = 'none';
+        }
+        
+        // NEW: CRM Inspection Date UI logic
+        let inspContainer = document.getElementById('sheet-insp-container');
+        if (acc.Inspection_Date) {
+            inspContainer.style.display = 'block';
+            document.getElementById('sheet-insp-date').innerText = acc.Inspection_Date;
+        } else {
+            inspContainer.style.display = 'none';
+        }
         
         document.getElementById('action-nav').href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
         
@@ -728,6 +812,8 @@
     function closeSurvey() {
         document.getElementById('survey-modal').classList.remove('active');
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+        // Force the map to re-evaluate the fire icons when the survey closes in case the dates were updated
+        filterMap(); 
     }
 
     function createNewBuilding(name) {
@@ -938,7 +1024,7 @@
             pdfHtml += `</ul></div>`;
         }
 
-        // Appended Standard Corporate Signature Required by Internal Guidelines[cite: 6]
+        // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
@@ -990,7 +1076,7 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement[cite: 6]
+        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
