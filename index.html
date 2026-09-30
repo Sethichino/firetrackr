@@ -8,11 +8,8 @@
     <link rel="manifest" href='data:application/manifest+json,{"name":"Firetrackr","short_name":"Firetrackr","display":"standalone","start_url":"."}'>
     <title>Firetrackr</title>
     
-    <!-- Leaflet JS & CSS for Mapping -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- PapaParse for CSV Processing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     
     <style>
@@ -32,7 +29,6 @@
         
         #map { flex-grow: 1; width: 100%; z-index: 1; }
         
-        /* Bottom Sheet UI */
         #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; }
         #bottom-sheet.active { transform: translateY(0); }
         
@@ -50,7 +46,6 @@
         .call-btn { background: #2e7d32; }
         .email-btn { background: #1565c0; }
         
-        /* Loading Overlay */
         #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -89,7 +84,6 @@
     <div id="map"></div>
 </div>
 
-<!-- Bottom Details Card -->
 <div id="bottom-sheet">
     <div class="sheet-header">
         <div>
@@ -116,7 +110,6 @@
     </div>
 </div>
 
-<!-- Loader -->
 <div id="loading-overlay">
     <div class="spinner"></div>
     <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing Data...</div>
@@ -126,10 +119,9 @@
     let map;
     let markersLayer = L.layerGroup();
     let allAccounts = [];
-    let userLat = 30.2672; // Default to Austin, TX
+    let userLat = 30.2672; 
     let userLon = -97.7431;
 
-    // Initialize Map and Load Saved Data
     function initMap() {
         map = L.map('map').setView([userLat, userLon], 10);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -138,7 +130,6 @@
         }).addTo(map);
         markersLayer.addTo(map);
 
-        // Get Real-time GPS Location
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
                 userLat = pos.coords.latitude;
@@ -154,9 +145,7 @@
                     fillOpacity: 1
                 }).addTo(map).bindPopup("<b>Your Current Location</b>");
                 
-                // Once location is found, check for saved accounts
                 loadSavedAccounts();
-                
             }, err => {
                 alert("Location access denied. Defaulting to Central Texas.");
                 loadSavedAccounts();
@@ -166,7 +155,6 @@
         }
     }
 
-    // Load accounts from device memory
     function loadSavedAccounts() {
         let savedData = localStorage.getItem('firetrackr_accounts');
         if (savedData) {
@@ -175,7 +163,6 @@
         }
     }
 
-    // Haversine Distance Formula (Miles)
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 3958.8;
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -187,7 +174,6 @@
         return R * c;
     }
 
-    // CSV Upload & Parsing
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -197,13 +183,10 @@
             skipEmptyLines: true,
             complete: async function(results) {
                 let validRecords = new Map();
-                
-                // Get the exact headers from the file to handle dynamic CRM exports
                 let headers = results.meta.fields;
                 
-                // Find the index or exact name of the first column that looks like a business name
-                let nameField = headers.find(h => /name|company|account|customer|business/i.test(h)) || headers[0];
-                // Find the first column that looks like an address
+                // Prioritize 'topic' before falling back to 'company', 'business', or 'name'
+                let nameField = headers.find(h => /topic|business|company|account/i.test(h)) || headers.find(h => /name/i.test(h)) || headers[0];
                 let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[1];
                 let cityStateField = headers.find(h => /city|state|zip/i.test(h)) || headers[2];
                 let contactField = headers.find(h => /contact|first|last/i.test(h)) || headers[3];
@@ -218,7 +201,6 @@
                     if (bizName && street) {
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
                         if (!validRecords.has(key)) {
-                            // Standardize object keys for the UI
                             let formattedRow = {
                                 Business_Name: bizName,
                                 Street_Address: street,
@@ -241,8 +223,6 @@
                 }
                 
                 allAccounts = await runMockGeocoder(uniqueAccounts);
-                
-                // Save processed data to device local storage
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
                 
                 filterMap();
@@ -251,7 +231,6 @@
         });
     });
 
-    // Mock Loader: Simulates address geocoding instantly around the user's location
     async function runMockGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
         document.getElementById('loading-text').innerText = `Geocoding ${accounts.length} accounts...`;
@@ -269,7 +248,6 @@
         return accounts;
     }
 
-    // Filter Logic
     function filterMap() {
         markersLayer.clearLayers();
         closeSheet();
@@ -305,13 +283,10 @@
         }
     }
 
-    // UI Bottom Sheet
     function showDetails(acc, distance) {
-        // Force the Business Name to be the primary title
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
         document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
         
-        // Ensure Contact Name remains in the contact tab
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-date').innerText = acc.Inspection_Date || 'N/A';
         
