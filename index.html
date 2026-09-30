@@ -59,6 +59,12 @@
         .survey-header h3 { margin: 0; font-size: 1.1rem; }
         .survey-content { flex-grow: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
         
+        /* Add Manual Lead Modal */
+        #manual-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 4000; display: none; justify-content: center; align-items: center; padding: 20px; }
+        #manual-modal.active { display: flex; }
+        .manual-card { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .manual-card h3 { margin-top: 0; color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;}
+        
         .building-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
         .bldg-header { font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #673ab7; }
         
@@ -84,14 +90,10 @@
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* The hidden container specifically designed for Native OS Printing */
         #print-container { display: none; }
         
         @media print {
-            /* Hide all application elements */
-            #app-container, #bottom-sheet, #survey-modal, #loading-overlay { display: none !important; }
-            
-            /* Show only the structured print container */
+            #app-container, #bottom-sheet, #survey-modal, #loading-overlay, #manual-modal { display: none !important; }
             #print-container { 
                 display: block !important; 
                 position: absolute; 
@@ -116,9 +118,14 @@
     </div>
     
     <div id="controls">
-        <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9;">
+        <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9; margin-bottom: 5px;">
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
-            <button onclick="clearData()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">🗑️ Remove & Upload New File</button>
+            <div style="display: flex; gap: 8px;">
+                <!-- Updated Add New Export button logic -->
+                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Add/Update Export</button>
+                <button onclick="openManualModal()" style="flex: 1; padding: 12px; background: #f57c00; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">➕ Add Manual Lead</button>
+            </div>
+            <button onclick="clearData()" style="width: 100%; padding: 8px; background: none; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 6px; font-weight: bold; font-size: 0.85rem; cursor: pointer; margin-top: 10px;">🗑️ Delete All Data</button>
         </div>
 
         <div class="control-group" id="upload-group">
@@ -135,6 +142,37 @@
     </div>
     
     <div id="map"></div>
+</div>
+
+<!-- Manual Entry Modal -->
+<div id="manual-modal">
+    <div class="manual-card">
+        <h3>Add Manual Lead</h3>
+        <div class="control-group" style="margin-bottom: 10px;">
+            <label>Business Name (Required)</label>
+            <input type="text" id="manual-name" placeholder="e.g. Cedar Park Plaza">
+        </div>
+        <div class="control-group" style="margin-bottom: 10px;">
+            <label>Street Address (Required)</label>
+            <input type="text" id="manual-street" placeholder="e.g. 123 Main St">
+        </div>
+        <div class="control-group" style="margin-bottom: 10px;">
+            <label>City, State, Zip</label>
+            <input type="text" id="manual-city" placeholder="e.g. Cedar Park, TX 78613">
+        </div>
+        <div class="control-group" style="margin-bottom: 10px;">
+            <label>Contact Name</label>
+            <input type="text" id="manual-contact">
+        </div>
+        <div class="control-group" style="margin-bottom: 20px;">
+            <label>Phone</label>
+            <input type="text" id="manual-phone">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button onclick="closeManualModal()" style="flex: 1; padding: 10px; background: #9e9e9e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancel</button>
+            <button onclick="saveManualLead()" style="flex: 1; padding: 10px; background: #2e7d32; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Save Lead</button>
+        </div>
+    </div>
 </div>
 
 <div id="bottom-sheet">
@@ -185,7 +223,6 @@
     <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing...</div>
 </div>
 
-<!-- This container exclusively appears when the Native Print Dialog is triggered -->
 <div id="print-container"></div>
 
 <script>
@@ -262,13 +299,15 @@
     }
 
     function clearData() {
-        localStorage.removeItem('firetrackr_accounts');
-        allAccounts = []; markersLayer.clearLayers();
-        document.getElementById('upload-group').style.display = 'flex';
-        document.getElementById('data-status-container').style.display = 'none';
-        document.getElementById('csv-file').value = '';
-        map.setView([userLat, userLon], 10);
-        closeSheet();
+        if(confirm("Are you sure you want to permanently delete all leads, surveys, and photos?")) {
+            localStorage.removeItem('firetrackr_accounts');
+            allAccounts = []; markersLayer.clearLayers();
+            document.getElementById('upload-group').style.display = 'flex';
+            document.getElementById('data-status-container').style.display = 'none';
+            document.getElementById('csv-file').value = '';
+            map.setView([userLat, userLon], 10);
+            closeSheet();
+        }
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -278,6 +317,9 @@
         return R * c;
     }
 
+    /* =========================================
+       THE UPSERT ENGINE (Update + Insert)
+       ========================================= */
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -285,7 +327,6 @@
         Papa.parse(file, {
             header: true, skipEmptyLines: true,
             complete: async function(results) {
-                let validRecords = new Map();
                 let headers = results.meta.fields;
                 
                 let nameField = headers.find(h => /topic|business|company|account/i.test(h)) || headers.find(h => /name/i.test(h)) || headers[0];
@@ -294,12 +335,23 @@
                 let contactField = headers.find(h => /contact|first|last/i.test(h)) || headers[3];
                 let phoneField = headers.find(h => /phone|mobile/i.test(h)) || headers[4];
 
+                let newOrUpdatedAccounts = [];
+
                 results.data.forEach(row => {
                     let bizName = row[nameField]; let street = row[addressField];
                     if (bizName && street) {
                         let key = `${String(bizName).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
-                        if (!validRecords.has(key)) {
-                            validRecords.set(key, {
+                        
+                        // Check if this account already exists in memory
+                        let existingIndex = allAccounts.findIndex(acc => acc.id === key);
+                        
+                        if (existingIndex >= 0) {
+                            // UPDATE EXISTING: Overwrite contact info, preserve surveys/photos/visit status
+                            allAccounts[existingIndex].Contact_Name = row[contactField] || allAccounts[existingIndex].Contact_Name;
+                            allAccounts[existingIndex].Phone = row[phoneField] || allAccounts[existingIndex].Phone;
+                        } else {
+                            // INSERT NEW: Prepare it for the mock geocoder
+                            newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
                                 'City, State, Zip': row[cityStateField] || '', Contact_Name: row[contactField] || '',
                                 Phone: row[phoneField] || '', visited: false, surveys: [] 
@@ -308,12 +360,21 @@
                     }
                 });
                 
-                let uniqueAccounts = Array.from(validRecords.values());
-                if (uniqueAccounts.length === 0) { alert("Could not detect Name and Address columns."); return; }
+                // If there are brand new accounts, geocode them and merge them into the master list
+                if (newOrUpdatedAccounts.length > 0) {
+                    let geocodedNew = await runMockGeocoder(newOrUpdatedAccounts);
+                    allAccounts = allAccounts.concat(geocodedNew);
+                } else if (allAccounts.length === 0) {
+                    alert("Could not detect Name and Address columns."); return;
+                }
                 
-                allAccounts = await runMockGeocoder(uniqueAccounts);
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-                loadSavedAccounts();
+                
+                document.getElementById('upload-group').style.display = 'none';
+                document.getElementById('data-status-container').style.display = 'block';
+                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
+                
+                filterMap();
                 e.target.value = '';
             }
         });
@@ -329,6 +390,64 @@
         });
         document.getElementById('loading-overlay').style.display = 'none';
         return accounts;
+    }
+
+    /* =========================================
+       MANUAL LEAD ENTRY LOGIC
+       ========================================= */
+    function openManualModal() {
+        document.getElementById('manual-modal').classList.add('active');
+    }
+
+    function closeManualModal() {
+        document.getElementById('manual-modal').classList.remove('active');
+        document.getElementById('manual-name').value = '';
+        document.getElementById('manual-street').value = '';
+        document.getElementById('manual-city').value = '';
+        document.getElementById('manual-contact').value = '';
+        document.getElementById('manual-phone').value = '';
+    }
+
+    async function saveManualLead() {
+        let name = document.getElementById('manual-name').value;
+        let street = document.getElementById('manual-street').value;
+        
+        if(!name || !street) {
+            alert("Business Name and Street Address are required.");
+            return;
+        }
+
+        let key = `${String(name).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
+        
+        if (allAccounts.findIndex(acc => acc.id === key) >= 0) {
+            alert("This account already exists in your list.");
+            return;
+        }
+
+        let newLead = [{
+            id: key, 
+            Business_Name: name, 
+            Street_Address: street,
+            'City, State, Zip': document.getElementById('manual-city').value, 
+            Contact_Name: document.getElementById('manual-contact').value,
+            Phone: document.getElementById('manual-phone').value, 
+            visited: false, 
+            surveys: [] 
+        }];
+
+        // Geocode the single manual lead
+        let geocodedLead = await runMockGeocoder(newLead);
+        
+        // Push to master list and save
+        allAccounts.push(geocodedLead[0]);
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+        
+        document.getElementById('upload-group').style.display = 'none';
+        document.getElementById('data-status-container').style.display = 'block';
+        document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
+        
+        closeManualModal();
+        filterMap();
     }
 
     function filterMap() {
@@ -586,7 +705,6 @@
         
         let acc = currentSelectedAccount;
         
-        // Build the HTML strictly for the Print Spooler
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
         pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
@@ -633,18 +751,13 @@
             pdfHtml += `</div>`;
         });
 
-        // Exact Corporate Signature requirement embedded into the printed PDF
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
-        // Inject HTML into the dedicated print container
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        // Trigger the native Android Print-to-PDF Dialog
-        setTimeout(() => {
-            window.print();
-        }, 300);
+        setTimeout(() => { window.print(); }, 300);
     }
 
     function emailReport() {
@@ -680,7 +793,6 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
