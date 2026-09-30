@@ -13,8 +13,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <!-- Updated HTML2PDF Library Configuration -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <style>
@@ -87,7 +85,7 @@
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-        /* Hidden PDF Container with simple, rigid styling to prevent renderer crashes */
+        /* Fallback rendering for the PDF exporter */
         #pdf-export-container { 
             position: absolute; 
             left: -9999px; 
@@ -573,7 +571,7 @@
         });
     }
 
-    function generatePDF() {
+    async function generatePDF() {
         if (!currentSelectedAccount) return;
         
         document.getElementById('loading-overlay').style.display = 'flex';
@@ -581,17 +579,16 @@
         
         let acc = currentSelectedAccount;
         
-        // Use inline-block rendering instead of flex/grid to prevent html2pdf from crashing
-        let pdfHtml = `<div style="padding: 20px;">`;
+        let pdfHtml = `<div style="padding: 20px; font-family: Helvetica, Arial, sans-serif; color: #333;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
+        pdfHtml += `<p style="margin-bottom: 30px; font-size: 14px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid; display: block;">`;
             pdfHtml += `<h3 style="margin-top: 0; color: #673ab7; margin-bottom: 10px;">${bldg.name}</h3>`;
-            pdfHtml += `<p style="margin-bottom: 15px;"><strong>Inspection Due:</strong> ${bldg.inspectionDue || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
+            pdfHtml += `<p style="margin-bottom: 15px; font-size: 13px;"><strong>Inspection Due:</strong> ${bldg.inspectionDue || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
 
-            pdfHtml += `<h4 style="margin-bottom: 5px;">Device Inventory (Estimated Totals):</h4><ul style="margin-top: 5px; margin-bottom: 15px;">`;
+            pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 14px;">Device Inventory (Estimated Totals):</h4><ul style="margin-top: 5px; margin-bottom: 15px; font-size: 13px;">`;
             let hasDevices = false;
             SURVEY_FIELDS.forEach(f => {
                 if (bldg.counts[f.id] > 0) { 
@@ -603,14 +600,14 @@
             pdfHtml += `</ul>`;
 
             if (bldg.hasTags || bldg.notes) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Notes & Deficiencies:</h4><ul style="margin-top: 5px; color: #d32f2f; margin-bottom: 15px;">`;
+                pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 14px;">Notes & Deficiencies:</h4><ul style="margin-top: 5px; color: #d32f2f; margin-bottom: 15px; font-size: 13px;">`;
                 if (bldg.hasTags) pdfHtml += `<li style="margin-bottom: 3px;"><strong>Status:</strong> ${bldg.hasTags}</li>`;
                 if (bldg.notes) pdfHtml += `<li style="margin-bottom: 3px;"><strong>Notes:</strong> ${bldg.notes}</li>`;
                 pdfHtml += `</ul>`;
             }
 
             if (bldg.photos && bldg.photos.length > 0) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Asset Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
+                pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 14px;">Asset Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
                 bldg.photos.forEach(p => { 
                     pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
                 });
@@ -618,7 +615,7 @@
             }
 
             if (bldg.tagPhotos && bldg.tagPhotos.length > 0) {
-                pdfHtml += `<h4 style="margin-bottom: 5px;">Deficiency Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
+                pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 14px;">Deficiency Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
                 bldg.tagPhotos.forEach(p => { 
                     pdfHtml += `<img src="${p}" style="height: 150px; border-radius: 4px; border: 2px solid #d32f2f; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
                 });
@@ -628,15 +625,32 @@
             pdfHtml += `</div>`;
         });
 
-        // Exact Corporate Signature requirement
-        pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 0.9em; line-height: 1.4; display: block;">`;
+        pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 12px; line-height: 1.4; display: block;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         let container = document.getElementById('pdf-export-container');
         container.innerHTML = pdfHtml;
 
-        // Give the DOM a moment to physically attach the images before triggering the PDF canvas
+        // Create an array of promises that wait for every single image to physically load into the DOM
+        let images = container.getElementsByTagName('img');
+        let imagePromises = [];
+        
+        for (let i = 0; i < images.length; i++) {
+            imagePromises.push(new Promise((resolve, reject) => {
+                if (images[i].complete) {
+                    resolve();
+                } else {
+                    images[i].onload = resolve;
+                    images[i].onerror = resolve; // Resolve on error too, so the PDF doesn't stall indefinitely
+                }
+            }));
+        }
+
+        // Wait for all images to load before firing the PDF engine
+        await Promise.all(imagePromises);
+        
+        // Give the browser one final frame to paint the layout
         setTimeout(() => {
             let opt = {
                 margin:       0.5,
@@ -652,7 +666,7 @@
                 alert("Error generating PDF. Please try again.");
                 document.getElementById('loading-overlay').style.display = 'none';
             });
-        }, 500);
+        }, 300);
     }
 
     function emailReport() {
@@ -688,7 +702,6 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
