@@ -57,15 +57,21 @@
     <div id="header">Firetrackr</div>
     
     <div id="controls">
-        <div class="control-group">
+        <!-- New Data Status UI -->
+        <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9;">
+            <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
+            <button onclick="clearData()" style="width: 100%; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.95rem; cursor: pointer;">🗑️ Remove & Upload New File</button>
+        </div>
+
+        <div class="control-group" id="upload-group">
             <label>Upload CRM Export (CSV)</label>
             <input type="file" id="csv-file" accept=".csv">
         </div>
         
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <label>Radius: <span id="radius-val">10</span> miles</label>
-                <input type="range" id="radius-slider" min="1" max="25" value="10" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+                <label>Radius: <span id="radius-val">25</span> miles</label>
+                <input type="range" id="radius-slider" min="1" max="100" value="25" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
         </div>
         
@@ -159,8 +165,24 @@
         let savedData = localStorage.getItem('firetrackr_accounts');
         if (savedData) {
             allAccounts = JSON.parse(savedData);
+            document.getElementById('upload-group').style.display = 'none';
+            document.getElementById('data-status-container').style.display = 'block';
+            document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
             filterMap();
+        } else {
+            document.getElementById('upload-group').style.display = 'flex';
+            document.getElementById('data-status-container').style.display = 'none';
         }
+    }
+
+    function clearData() {
+        localStorage.removeItem('firetrackr_accounts');
+        allAccounts = [];
+        markersLayer.clearLayers();
+        document.getElementById('upload-group').style.display = 'flex';
+        document.getElementById('data-status-container').style.display = 'none';
+        document.getElementById('csv-file').value = '';
+        map.setView([userLat, userLon], 10);
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -185,7 +207,6 @@
                 let validRecords = new Map();
                 let headers = results.meta.fields;
                 
-                // Prioritize 'topic' before falling back to 'company', 'business', or 'name'
                 let nameField = headers.find(h => /topic|business|company|account/i.test(h)) || headers.find(h => /name/i.test(h)) || headers[0];
                 let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[1];
                 let cityStateField = headers.find(h => /city|state|zip/i.test(h)) || headers[2];
@@ -224,6 +245,10 @@
                 
                 allAccounts = await runMockGeocoder(uniqueAccounts);
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+                
+                document.getElementById('upload-group').style.display = 'none';
+                document.getElementById('data-status-container').style.display = 'block';
+                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
                 
                 filterMap();
                 e.target.value = '';
