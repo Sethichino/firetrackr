@@ -86,7 +86,7 @@
         .btn-pdf { background: #d32f2f; }
         .btn-email { background: #2e7d32; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; text-align: center; padding: 20px;}
+        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; text-align: center; padding: 20px;}
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -134,7 +134,6 @@
         
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <!-- High Density Filter: Defaulting to 2 miles -->
                 <label>Radius: <span id="radius-val">2</span> miles</label>
                 <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
@@ -316,7 +315,7 @@
         return R * c;
     }
 
-    // STRICT Data extraction. Digs into complex Dynamics export arrays and blocks URL columns
+    // STRICT Data extraction. Blocks Web Address fields natively exported by Dynamics CRM
     function extractTextData(value) {
         if (value === null || value === undefined) return '';
         
@@ -345,17 +344,32 @@
         Papa.parse(file, {
             header: true, skipEmptyLines: true,
             complete: async function(results) {
+                if (results.data.length === 0) return;
+                
                 let headers = results.meta.fields;
                 
-                // Exclude columns containing Web, URL, or Email from matching as Names or Addresses
-                let nameField = headers.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/url|web|email/i.test(h)) || headers[0];
+                // Advanced column sniffing blocking Dynamics URL columns
+                let nameField = headers.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || headers[0];
                 
-                let addressField = headers.find(h => /street 1|address 1/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers.find(h => /street|address/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers[1];
+                let addressField = headers.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || headers.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
                 
-                let cityStateField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h)) || headers.find(h => /zip|postal/i.test(h)) || headers[2];
+                // If the CRM named the column something bizarre, scan row 1 for a physical address pattern
+                if (!addressField) {
+                    for (let h of headers) {
+                        let sample = String(results.data[0][h] || '').trim();
+                        if (/^\d+\s+[a-zA-Z]/.test(sample) && !/^\d{5}/.test(sample)) { 
+                            addressField = h; break; 
+                        }
+                    }
+                }
+                if (!addressField) addressField = headers[1];
+                
+                let cityField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h));
+                let stateField = headers.find(h => /state|province/i.test(h));
+                let zipField = headers.find(h => /zip|postal/i.test(h));
+                let combinedCityStateField = headers.find(h => /city, state|city state/i.test(h));
                 
                 let contactField = headers.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
-                
                 let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
 
                 let newOrUpdatedAccounts = [];
@@ -369,15 +383,18 @@
                         let existingIndex = allAccounts.findIndex(acc => acc.id === key);
                         
                         let extractedCityStateZip = '';
-                        if (row[cityStateField]) {
-                             extractedCityStateZip = extractTextData(row[cityStateField]);
+                        if (cityField && stateField && zipField) {
+                            extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])} ${extractTextData(row[zipField])}`;
+                        } else if (cityField && stateField) {
+                            extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])}`;
+                        } else if (combinedCityStateField) {
+                            extractedCityStateZip = extractTextData(row[combinedCityStateField]);
                         } else {
-                             let fallbacks = [row['City, State, Zip'], row.City, row.city];
-                             for(let f of fallbacks) {
-                                 let parsed = extractTextData(f);
-                                 if (parsed.length > 2) { extractedCityStateZip = parsed; break; }
-                             }
+                            let genericCityField = headers.find(h => /city/i.test(h)) || headers[2];
+                            extractedCityStateZip = extractTextData(row[genericCityField]);
                         }
+                        
+                        extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
                         
                         if (existingIndex >= 0) {
                             allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
@@ -412,17 +429,19 @@
         });
     });
 
-    // TRUE LIVE GEOCODER: Translates addresses directly to OpenStreetMap Coordinates
     async function runRealGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
         let processed = 0;
         
         for (let acc of accounts) {
             if (!acc.lat || !acc.lon) {
-                document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Free GPS API limited to 1 address per sec.\nPlease do not close the app.)`;
+                document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Satellite limit: 1 address per sec.\nPlease keep screen active.)`;
                 
                 try {
-                    let query = `${acc.Street_Address}, ${acc['City, State, Zip']}`.trim();
+                    // Strip Suite/Apt numbers to prevent Nominatim from falling back to a street centroid 0.3 miles away
+                    let queryStreet = String(acc.Street_Address).replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
+                    let query = `${queryStreet}, ${acc['City, State, Zip']}`.replace(/^[,\s]+|[,\s]+$/g, '').trim();
+                    
                     let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
                     let data = await response.json();
                     
@@ -430,13 +449,13 @@
                         acc.lat = parseFloat(data[0].lat);
                         acc.lon = parseFloat(data[0].lon);
                     } else {
+                        // Fallback to City Center if strictly necessary
                         let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(acc['City, State, Zip'])}`);
                         let cityData = await cityResponse.json();
                         if (cityData && cityData.length > 0) {
                             acc.lat = parseFloat(cityData[0].lat);
                             acc.lon = parseFloat(cityData[0].lon);
                         } else {
-                            // Fallback to random offset near user if the address physically does not exist on map yet
                             acc.lat = userLat + (Math.random() * 0.05 - 0.025);
                             acc.lon = userLon + (Math.random() * 0.05 - 0.025);
                         }
@@ -446,11 +465,8 @@
                     acc.lon = userLon + (Math.random() * 0.05 - 0.025);
                 }
                 
-                // Strictly respect OSM 1 request per second API rules to prevent server blacklisting
-                await new Promise(r => setTimeout(r, 1100)); 
-                
-                // Incrementally save progress so if the user forces the app closed, the plotted leads are retained
                 processed++;
+                await new Promise(r => setTimeout(r, 1100)); // Respect OpenStreetMap rate limits
             }
         }
         document.getElementById('loading-overlay').style.display = 'none';
@@ -773,12 +789,10 @@
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        // Dynamically alter the browser document title to force the native OS to rename the PDF
         const originalTitle = document.title;
         const cleanTitle = acc.Business_Name.replace(/[^a-zA-Z0-9 ]/g, '').trim(); 
         document.title = `${cleanTitle} Site Survey`;
         
-        // Delay the print prompt slightly to ensure Android registers the new title, then revert it
         setTimeout(() => { 
             window.print(); 
             setTimeout(() => { document.title = originalTitle; }, 3000);
