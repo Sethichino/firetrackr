@@ -33,7 +33,6 @@
         textarea { resize: vertical; min-height: 80px; }
         input[type="range"] { width: 100%; }
         
-        /* Custom Toggle Switch for Active Alarms */
         .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
@@ -42,6 +41,9 @@
         input:checked + .slider:before { transform: translateX(20px); }
         
         #map { flex-grow: 1; width: 100%; z-index: 1; }
+        
+        /* Custom Div Icon for the Fire Truck Emoji */
+        .custom-div-icon { background: transparent; border: none; }
         
         #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; max-height: 85vh; overflow-y: auto;}
         #bottom-sheet.active { transform: translateY(0); }
@@ -55,7 +57,6 @@
         .info-item { font-size: 0.85rem; color: #555; }
         .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
         
-        /* Alarm History UI */
         #alarm-history-container { margin-bottom: 20px; border: 1px solid #ffcdd2; border-radius: 8px; overflow: hidden; display: none; }
         .alarm-header { background: #d32f2f; color: white; padding: 8px 12px; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;}
         .alarm-list { background: #ffebee; padding: 10px; max-height: 150px; overflow-y: auto; }
@@ -129,8 +130,6 @@
             
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
                 <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Leads</button>
-                
-                <!-- NEW: Alarm Import Button -->
                 <button onclick="document.getElementById('alarm-file').click()" style="flex: 1; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">🔥 Import Alarms</button>
             </div>
             
@@ -145,7 +144,6 @@
             <input type="file" id="csv-file" accept=".csv">
         </div>
         
-        <!-- Hidden input for Alarm CSV -->
         <input type="file" id="alarm-file" accept=".csv" style="display:none;">
         
         <div class="row">
@@ -154,7 +152,6 @@
                 <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
             
-            <!-- NEW: Active Alarms Filter Toggle -->
             <div class="control-group" style="align-items: center; justify-content: center;">
                 <label style="margin-bottom: 4px; color: #d32f2f;">🔥 Active Alarms</label>
                 <label class="switch">
@@ -207,7 +204,6 @@
         <button class="close-btn" onclick="closeSheet()">×</button>
     </div>
     
-    <!-- NEW: Alarm History Display -->
     <div id="alarm-history-container">
         <div class="alarm-header">
             <span>🚨 Recent Alarm Activity</span>
@@ -303,11 +299,12 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
     
-    // NEW: Fire icon for active alarms
-    const fireIcon = new L.Icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+    // NEW: Fire Truck Emoji Icon for active alarms!
+    const fireTruckIcon = L.divIcon({
+        html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🚒</div>',
+        className: 'custom-div-icon',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
     });
 
     function initMap() {
@@ -377,7 +374,7 @@
         return strVal;
     }
 
-    // LEAD IMPORTER
+    // LEAD IMPORTER - Now resilient against missing Address columns
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -388,23 +385,35 @@
                 if (results.data.length === 0) return;
                 
                 let headers = results.meta.fields;
-                let nameField = headers.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || headers[0];
-                let addressField = headers.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || headers.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
+                
+                // CRITICAL FIX: Explicitly exclude Dynamics CRM's hidden internal columns
+                let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
+                
+                let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
+                
+                let addressField = validHeaders.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || validHeaders.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
                 
                 if (!addressField) {
-                    for (let h of headers) {
+                    for (let h of validHeaders) {
                         let sample = String(results.data[0][h] || '').trim();
                         if (/^\d+\s+[a-zA-Z]/.test(sample) && !/^\d{5}/.test(sample)) { addressField = h; break; }
                     }
                 }
-                if (!addressField) addressField = headers[1];
                 
-                let cityField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h));
-                let stateField = headers.find(h => /state|province/i.test(h));
-                let zipField = headers.find(h => /zip|postal/i.test(h));
-                let combinedCityStateField = headers.find(h => /city, state|city state/i.test(h));
-                let contactField = headers.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
-                let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
+                // CRITICAL FIX: If no address field is found, STOP execution and alert the user.
+                if (!addressField) {
+                    alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
+                    document.getElementById('upload-group').style.display = 'flex';
+                    e.target.value = '';
+                    return;
+                }
+                
+                let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
+                let stateField = validHeaders.find(h => /state|province/i.test(h));
+                let zipField = validHeaders.find(h => /zip|postal/i.test(h));
+                let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
+                let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name|last name/i.test(h));
+                let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
 
                 let newOrUpdatedAccounts = [];
 
@@ -423,22 +432,23 @@
                             extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])}`;
                         } else if (combinedCityStateField) {
                             extractedCityStateZip = extractTextData(row[combinedCityStateField]);
-                        } else {
-                            let genericCityField = headers.find(h => /city/i.test(h)) || headers[2];
-                            extractedCityStateZip = extractTextData(row[genericCityField]);
+                        } else if (cityField) {
+                            extractedCityStateZip = extractTextData(row[cityField]);
                         }
                         
                         extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
                         
                         if (existingIndex >= 0) {
-                            allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
-                            allAccounts[existingIndex].Phone = extractTextData(row[phoneField]) || allAccounts[existingIndex].Phone;
+                            if (contactField) allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
+                            if (phoneField) allAccounts[existingIndex].Phone = extractTextData(row[phoneField]) || allAccounts[existingIndex].Phone;
                             allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
                         } else {
                             newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
-                                'City, State, Zip': extractedCityStateZip, Contact_Name: extractTextData(row[contactField]),
-                                Phone: extractTextData(row[phoneField]), visited: false, surveys: [], alarms: [] // Initialize empty alarm array
+                                'City, State, Zip': extractedCityStateZip, 
+                                Contact_Name: contactField ? extractTextData(row[contactField]) : '',
+                                Phone: phoneField ? extractTextData(row[phoneField]) : '', 
+                                visited: false, surveys: [], alarms: []
                             });
                         }
                     }
@@ -447,8 +457,6 @@
                 if (newOrUpdatedAccounts.length > 0) {
                     let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
                     allAccounts = allAccounts.concat(geocodedNew);
-                } else if (allAccounts.length === 0) {
-                    alert("Could not detect Name and Address columns."); return;
                 }
                 
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
@@ -463,7 +471,7 @@
         });
     });
 
-    // NEW ALARM IMPORTER
+    // ALARM IMPORTER
     document.getElementById('alarm-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -481,7 +489,6 @@
             complete: function(results) {
                 let headers = results.meta.fields;
                 
-                // Identify the specific columns in the alarm dispatch log
                 let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[0];
                 let dateField = headers.find(h => /date|time/i.test(h)) || headers[1];
                 let notesField = headers.find(h => /note|description|detail|issue/i.test(h)) || headers[2];
@@ -494,10 +501,8 @@
                     let rawAddress = extractTextData(row[addressField]).toLowerCase();
                     if(!rawAddress) return;
                     
-                    // Basic address cleanup for better matching against leads
                     let cleanAlarmStreet = rawAddress.replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
 
-                    // Search memory for a lead at this address
                     let matchedAccount = allAccounts.find(acc => acc.Street_Address.toLowerCase().includes(cleanAlarmStreet) || cleanAlarmStreet.includes(acc.Street_Address.toLowerCase()));
                     
                     if (matchedAccount) {
@@ -506,7 +511,6 @@
                         let alarmDateStr = extractTextData(row[dateField]);
                         let alarmNotes = extractTextData(row[notesField]);
                         
-                        // Check if this exact alarm is already recorded to prevent duplicates
                         let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
                         
                         if (!isDuplicate) {
@@ -516,15 +520,8 @@
                                 if (alarmDateObj >= thirtyDaysAgo) isActive = true;
                             } catch(e) {}
                             
-                            matchedAccount.alarms.push({
-                                date: alarmDateStr,
-                                notes: alarmNotes,
-                                active: isActive
-                            });
-                            
-                            // If any alarm is active, flag the whole account
+                            matchedAccount.alarms.push({ date: alarmDateStr, notes: alarmNotes, active: isActive });
                             if (isActive) matchedAccount.hasActiveAlarm = true;
-                            
                             matchCount++;
                         }
                     }
@@ -624,15 +621,13 @@
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
             
-            // Logic to filter strictly by Active Alarms if toggle is ON
             if (showActiveAlarmsOnly && !acc.hasActiveAlarm) return;
             
-            // Determine Pin Icon
             let pinIcon = defaultIcon;
             if (acc.hasActiveAlarm) {
-                pinIcon = fireIcon; // High priority override
+                pinIcon = fireTruckIcon; 
             } else if (acc.visited) {
-                pinIcon = visitedIcon; // Gray out if visited
+                pinIcon = visitedIcon;
             }
             
             let marker = L.marker([acc.lat, acc.lon], { icon: pinIcon });
@@ -662,14 +657,12 @@
         if (acc.Phone) { callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`; callBtn.style.display = 'flex'; } 
         else { callBtn.style.display = 'none'; }
         
-        // Render Alarm History in UI
         let alarmContainer = document.getElementById('alarm-history-container');
         if (acc.alarms && acc.alarms.length > 0) {
             alarmContainer.style.display = 'block';
             document.getElementById('alarm-count-badge').innerText = acc.alarms.length;
             
             let listHtml = '';
-            // Sort alarms by date, newest first
             let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
             
             sortedAlarms.forEach(al => {
@@ -683,7 +676,6 @@
             });
             document.getElementById('alarm-list-content').innerHTML = listHtml;
             
-            // Highlight the header if there is an active alarm
             if (acc.hasActiveAlarm) {
                 document.querySelector('.alarm-header').style.background = '#d32f2f';
                 document.getElementById('alarm-count-badge').style.color = '#d32f2f';
@@ -934,7 +926,6 @@
             pdfHtml += `</div>`;
         });
 
-        // Add standard alarm history to the PDF if it exists
         if (acc.alarms && acc.alarms.length > 0) {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ffcdd2; border-radius: 8px;">`;
             pdfHtml += `<h3 style="margin-top: 0; color: #d32f2f; margin-bottom: 10px;">Alarm Dispatch History</h3>`;
@@ -947,7 +938,7 @@
             pdfHtml += `</ul></div>`;
         }
 
-        // Appended Standard Corporate Signature Required by Internal Guidelines
+        // Appended Standard Corporate Signature Required by Internal Guidelines[cite: 6]
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
@@ -999,7 +990,7 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement
+        // Exact Corporate Signature requirement[cite: 6]
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
