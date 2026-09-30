@@ -133,8 +133,9 @@
         
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <label>Radius: <span id="radius-val">25</span> miles</label>
-                <input type="range" id="radius-slider" min="1" max="100" value="25" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+                <label>Radius: <span id="radius-val">2</span> miles</label>
+                <!-- Default slider set to 2 miles -->
+                <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
         </div>
     </div>
@@ -314,13 +315,12 @@
         return R * c;
     }
 
-    // STRICT string enforcement to prevent JS from rendering object literals in the address line
-    function parseLocationString(value) {
-        if (!value) return '';
-        let strVal = String(value).trim();
-        if (strVal.includes('[object')) return '';
-        if (strVal === 'undefined' || strVal === 'null') return '';
-        return strVal;
+    // STRICT string enforcement to prevent JS from rendering object literals in the address line or crashing
+    function sanitizeField(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value !== 'string') value = String(value);
+        if (value.includes('[object')) return ''; // Catch generic object parsing errors from bad CSV headers
+        return value.trim();
     }
 
     document.getElementById('csv-file').addEventListener('change', function(e) {
@@ -341,33 +341,35 @@
                 let newOrUpdatedAccounts = [];
 
                 results.data.forEach(row => {
-                    let bizName = parseLocationString(row[nameField]); 
-                    let street = parseLocationString(row[addressField]);
+                    // Strictly sanitize required fields
+                    let bizName = sanitizeField(row[nameField]); 
+                    let street = sanitizeField(row[addressField]);
                     
                     if (bizName && street) {
                         let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
                         let existingIndex = allAccounts.findIndex(acc => acc.id === key);
                         
+                        // Strictly extract city state zip safely without pulling random object strings
                         let extractedCityStateZip = '';
                         if (row[cityStateField]) {
-                             extractedCityStateZip = parseLocationString(row[cityStateField]);
+                             extractedCityStateZip = sanitizeField(row[cityStateField]);
                         } else {
                              let fallbacks = [row['City, State, Zip'], row.City, row.city];
                              for(let f of fallbacks) {
-                                 let parsed = parseLocationString(f);
+                                 let parsed = sanitizeField(f);
                                  if (parsed.length > 2) { extractedCityStateZip = parsed; break; }
                              }
                         }
                         
                         if (existingIndex >= 0) {
-                            allAccounts[existingIndex].Contact_Name = row[contactField] || allAccounts[existingIndex].Contact_Name;
-                            allAccounts[existingIndex].Phone = row[phoneField] || allAccounts[existingIndex].Phone;
+                            allAccounts[existingIndex].Contact_Name = sanitizeField(row[contactField]) || allAccounts[existingIndex].Contact_Name;
+                            allAccounts[existingIndex].Phone = sanitizeField(row[phoneField]) || allAccounts[existingIndex].Phone;
                             allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
                         } else {
                             newOrUpdatedAccounts.push({
                                 id: key, Business_Name: bizName, Street_Address: street,
-                                'City, State, Zip': extractedCityStateZip, Contact_Name: row[contactField] || '',
-                                Phone: row[phoneField] || '', visited: false, surveys: [] 
+                                'City, State, Zip': extractedCityStateZip, Contact_Name: sanitizeField(row[contactField]),
+                                Phone: sanitizeField(row[phoneField]), visited: false, surveys: [] 
                             });
                         }
                     }
@@ -413,17 +415,17 @@
     }
 
     async function saveManualLead() {
-        let name = document.getElementById('manual-name').value;
-        let street = document.getElementById('manual-street').value;
+        let name = sanitizeField(document.getElementById('manual-name').value);
+        let street = sanitizeField(document.getElementById('manual-street').value);
         if(!name || !street) { alert("Business Name and Street Address are required."); return; }
 
-        let key = `${String(name).trim().toLowerCase()}|${String(street).trim().toLowerCase()}`;
+        let key = `${name.toLowerCase()}|${street.toLowerCase()}`;
         if (allAccounts.findIndex(acc => acc.id === key) >= 0) { alert("This account already exists in your list."); return; }
 
         let newLead = [{
             id: key, Business_Name: name, Street_Address: street,
-            'City, State, Zip': document.getElementById('manual-city').value, 
-            Contact_Name: document.getElementById('manual-contact').value, Phone: document.getElementById('manual-phone').value, 
+            'City, State, Zip': sanitizeField(document.getElementById('manual-city').value), 
+            Contact_Name: sanitizeField(document.getElementById('manual-contact').value), Phone: sanitizeField(document.getElementById('manual-phone').value), 
             visited: false, surveys: [] 
         }];
 
@@ -463,9 +465,7 @@
         currentSelectedAccount = acc;
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
         
-        // Clean City State Zip handling
-        let cleanCityState = parseLocationString(acc['City, State, Zip']);
-        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cleanCityState} (${distance.toFixed(1)} mi)`;
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
         
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
@@ -555,7 +555,7 @@
 
     function updateTextField(bldgId, field, value) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
-        if(bldg) { bldg[field] = value; saveSurveyState(); }
+        if(bldg) { bldg[field] = sanitizeField(value); saveSurveyState(); }
     }
 
     function handlePhotoUpload(event, bldgId, targetArray) {
@@ -666,11 +666,10 @@
         if (!currentSelectedAccount) return;
         
         let acc = currentSelectedAccount;
-        let cleanCityState = parseLocationString(acc['City, State, Zip']);
         
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
+        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">`;
@@ -714,31 +713,28 @@
             pdfHtml += `</div>`;
         });
 
+        // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        // Ensure the PDF filename matches the desired naming convention
         const originalTitle = document.title;
-        const cleanTitle = acc.Business_Name.replace(/[^a-zA-Z0-9 ]/g, '').trim(); // Strip special characters for safe saving
+        const cleanTitle = acc.Business_Name.replace(/[^a-zA-Z0-9 ]/g, '').trim(); 
         document.title = `${cleanTitle} Site Survey`;
         
         setTimeout(() => { 
             window.print(); 
-            // Revert title after the print spooler has captured it
             setTimeout(() => { document.title = originalTitle; }, 1500);
         }, 500);
     }
 
     function emailReport() {
         let acc = currentSelectedAccount;
-        let cleanCityState = parseLocationString(acc['City, State, Zip']);
-                                
         let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
         
-        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${cleanCityState}\n\n`;
+        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${acc['City, State, Zip']}\n\n`;
 
         acc.surveys.forEach(bldg => {
             let panelStr = bldg.panel ? `[${bldg.panel}]` : '';
@@ -767,6 +763,7 @@
             body += `\n=================================\n\n`;
         });
         
+        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
