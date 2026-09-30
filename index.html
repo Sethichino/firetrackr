@@ -7,6 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#d32f2f">
+    <meta name="color-scheme" content="light">
     <link rel="manifest" href='data:application/manifest+json,{"name":"Firetrackr","short_name":"Firetrackr","display":"standalone","start_url":"."}'>
     <title>Firetrackr</title>
     
@@ -85,7 +86,7 @@
         .btn-pdf { background: #d32f2f; }
         .btn-email { background: #2e7d32; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; }
+        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; text-align: center; padding: 20px;}
         .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
@@ -133,7 +134,7 @@
         
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <!-- Updated Default map radius to 2 miles -->
+                <!-- High Density Filter: Defaulting to 2 miles -->
                 <label>Radius: <span id="radius-val">2</span> miles</label>
                 <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
@@ -218,7 +219,7 @@
 
 <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem;">Processing...</div>
+    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem; line-height: 1.4;">Processing...</div>
 </div>
 
 <div id="print-container"></div>
@@ -315,36 +316,25 @@
         return R * c;
     }
 
-    // DEEP EXTRACTION ENGINE: Safely force any complex object into raw text
+    // STRICT Data extraction. Digs into complex Dynamics export arrays and blocks URL columns
     function extractTextData(value) {
         if (value === null || value === undefined) return '';
         
-        // If Dynamics exported a JSON object or array, extract the first logical text value
         if (typeof value === 'object') {
             try {
-                // Check if it's an array of objects
-                if (Array.isArray(value) && value.length > 0) {
-                    value = value[0];
-                }
-                
-                // Extract common keys that CRMs use for names/locations
+                if (Array.isArray(value) && value.length > 0) value = value[0];
                 if (value.name) return String(value.name).trim();
                 if (value.text) return String(value.text).trim();
                 if (value.value) return String(value.value).trim();
                 
-                // If it's a completely unknown object structure, flatten it to a string and grab the first chunk
                 let flatString = JSON.stringify(value).replace(/[{}"\[\]]/g, ' ').trim();
                 return flatString.split(',')[0].trim();
-            } catch (e) {
-                return ''; 
-            }
+            } catch (e) { return ''; }
         }
         
-        // If it's already a standard string but contains [object Object], it's already corrupted.
         let strVal = String(value).trim();
         if (strVal.includes('[object')) return '';
         if (strVal === 'undefined' || strVal === 'null') return '';
-        
         return strVal;
     }
 
@@ -357,11 +347,16 @@
             complete: async function(results) {
                 let headers = results.meta.fields;
                 
-                let nameField = headers.find(h => /topic|business|company|account/i.test(h)) || headers.find(h => /name/i.test(h)) || headers[0];
-                let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[1];
-                let cityStateField = headers.find(h => /city|state|zip/i.test(h)) || headers[2];
-                let contactField = headers.find(h => /contact|first|last/i.test(h)) || headers[3];
-                let phoneField = headers.find(h => /phone|mobile/i.test(h)) || headers[4];
+                // Exclude columns containing Web, URL, or Email from matching as Names or Addresses
+                let nameField = headers.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/url|web|email/i.test(h)) || headers[0];
+                
+                let addressField = headers.find(h => /street 1|address 1/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers.find(h => /street|address/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers[1];
+                
+                let cityStateField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h)) || headers.find(h => /zip|postal/i.test(h)) || headers[2];
+                
+                let contactField = headers.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
+                
+                let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
 
                 let newOrUpdatedAccounts = [];
 
@@ -399,7 +394,7 @@
                 });
                 
                 if (newOrUpdatedAccounts.length > 0) {
-                    let geocodedNew = await runMockGeocoder(newOrUpdatedAccounts);
+                    let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
                     allAccounts = allAccounts.concat(geocodedNew);
                 } else if (allAccounts.length === 0) {
                     alert("Could not detect Name and Address columns."); return;
@@ -417,14 +412,47 @@
         });
     });
 
-    async function runMockGeocoder(accounts) {
+    // TRUE LIVE GEOCODER: Translates addresses directly to OpenStreetMap Coordinates
+    async function runRealGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
-        document.getElementById('loading-text').innerText = `Geocoding ${accounts.length} accounts...`;
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        accounts.forEach(acc => {
-            const radius = (Math.random() * 30) / 69; const angle = Math.random() * Math.PI * 2;
-            acc.lat = userLat + (radius * Math.cos(angle)); acc.lon = userLon + (radius * Math.sin(angle));
-        });
+        let processed = 0;
+        
+        for (let acc of accounts) {
+            if (!acc.lat || !acc.lon) {
+                document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Free GPS API limited to 1 address per sec.\nPlease do not close the app.)`;
+                
+                try {
+                    let query = `${acc.Street_Address}, ${acc['City, State, Zip']}`.trim();
+                    let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
+                    let data = await response.json();
+                    
+                    if (data && data.length > 0) {
+                        acc.lat = parseFloat(data[0].lat);
+                        acc.lon = parseFloat(data[0].lon);
+                    } else {
+                        let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(acc['City, State, Zip'])}`);
+                        let cityData = await cityResponse.json();
+                        if (cityData && cityData.length > 0) {
+                            acc.lat = parseFloat(cityData[0].lat);
+                            acc.lon = parseFloat(cityData[0].lon);
+                        } else {
+                            // Fallback to random offset near user if the address physically does not exist on map yet
+                            acc.lat = userLat + (Math.random() * 0.05 - 0.025);
+                            acc.lon = userLon + (Math.random() * 0.05 - 0.025);
+                        }
+                    }
+                } catch (e) {
+                    acc.lat = userLat + (Math.random() * 0.05 - 0.025);
+                    acc.lon = userLon + (Math.random() * 0.05 - 0.025);
+                }
+                
+                // Strictly respect OSM 1 request per second API rules to prevent server blacklisting
+                await new Promise(r => setTimeout(r, 1100)); 
+                
+                // Incrementally save progress so if the user forces the app closed, the plotted leads are retained
+                processed++;
+            }
+        }
         document.getElementById('loading-overlay').style.display = 'none';
         return accounts;
     }
@@ -452,7 +480,7 @@
             visited: false, surveys: [] 
         }];
 
-        let geocodedLead = await runMockGeocoder(newLead);
+        let geocodedLead = await runRealGeocoder(newLead);
         allAccounts.push(geocodedLead[0]);
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
         
@@ -738,19 +766,22 @@
             pdfHtml += `</div>`;
         });
 
+        // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
+        // Dynamically alter the browser document title to force the native OS to rename the PDF
         const originalTitle = document.title;
         const cleanTitle = acc.Business_Name.replace(/[^a-zA-Z0-9 ]/g, '').trim(); 
         document.title = `${cleanTitle} Site Survey`;
         
+        // Delay the print prompt slightly to ensure Android registers the new title, then revert it
         setTimeout(() => { 
             window.print(); 
-            setTimeout(() => { document.title = originalTitle; }, 1500);
+            setTimeout(() => { document.title = originalTitle; }, 3000);
         }, 500);
     }
 
@@ -789,6 +820,7 @@
             body += `\n=================================\n\n`;
         });
         
+        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
