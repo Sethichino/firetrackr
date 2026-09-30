@@ -314,11 +314,13 @@
         return R * c;
     }
 
+    // STRICT string enforcement to prevent JS from rendering object literals in the address line
     function parseLocationString(value) {
-        if (!value || typeof value !== 'string') return '';
-        // If the parser accidentally grabbed a literal object string, return empty
-        if (value.includes('[object')) return '';
-        return value.trim();
+        if (!value) return '';
+        let strVal = String(value).trim();
+        if (strVal.includes('[object')) return '';
+        if (strVal === 'undefined' || strVal === 'null') return '';
+        return strVal;
     }
 
     document.getElementById('csv-file').addEventListener('change', function(e) {
@@ -460,7 +462,11 @@
     function showDetails(acc, distance) {
         currentSelectedAccount = acc;
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
-        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${acc['City, State, Zip'] || ''} (${distance.toFixed(1)} mi)`;
+        
+        // Clean City State Zip handling
+        let cleanCityState = parseLocationString(acc['City, State, Zip']);
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cleanCityState} (${distance.toFixed(1)} mi)`;
+        
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
         
@@ -660,10 +666,11 @@
         if (!currentSelectedAccount) return;
         
         let acc = currentSelectedAccount;
+        let cleanCityState = parseLocationString(acc['City, State, Zip']);
         
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${acc['City, State, Zip']}</p>`;
+        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">`;
@@ -707,29 +714,31 @@
             pdfHtml += `</div>`;
         });
 
-        // Appended Standard Corporate Signature
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
 
         document.getElementById('print-container').innerHTML = pdfHtml;
         
-        // Dynamically alter the browser document title to force the native OS to rename the PDF
+        // Ensure the PDF filename matches the desired naming convention
         const originalTitle = document.title;
-        document.title = `${acc.Business_Name} Site Survey`;
+        const cleanTitle = acc.Business_Name.replace(/[^a-zA-Z0-9 ]/g, '').trim(); // Strip special characters for safe saving
+        document.title = `${cleanTitle} Site Survey`;
         
-        // Delay the print prompt slightly to ensure Android registers the new title, then revert it
         setTimeout(() => { 
             window.print(); 
-            setTimeout(() => { document.title = originalTitle; }, 3000);
+            // Revert title after the print spooler has captured it
+            setTimeout(() => { document.title = originalTitle; }, 1500);
         }, 500);
     }
 
     function emailReport() {
         let acc = currentSelectedAccount;
+        let cleanCityState = parseLocationString(acc['City, State, Zip']);
+                                
         let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
         
-        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${acc['City, State, Zip']}\n\n`;
+        let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${cleanCityState}\n\n`;
 
         acc.surveys.forEach(bldg => {
             let panelStr = bldg.panel ? `[${bldg.panel}]` : '';
@@ -758,7 +767,6 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
