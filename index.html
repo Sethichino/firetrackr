@@ -392,15 +392,49 @@
         return strVal;
     }
     
-    // NEW STRING NORMALIZATION ENGINE
-    // Strips away formatting differences between Microsoft Dynamics and City Dispatch systems
+    // THE FUZZY MATCHER ENGINE: Violently strips down addresses to fix CRM vs Municipal Log formatting errors
     function normalizeAddress(addr) {
         if (!addr) return '';
         let s = addr.toLowerCase();
-        s = s.replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '');
-        s = s.replace(/[^a-z0-9\s]/g, ' '); // Strip punctuation
-        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west)\b/g, '');
+        s = s.replace(/(suite|ste|apt|unit|bldg|building|#|rm|room|floor|fl)\s*[\w\d-]+/i, '');
+        s = s.replace(/[^a-z0-9\s]/g, ' '); 
+        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|tx|texas|loop|fm|rm)\b/g, '');
         return s.replace(/\s+/g, ' ').trim();
+    }
+    
+    function addressesMatch(leadAddr, alarmAddr) {
+        let nLead = normalizeAddress(leadAddr);
+        let nAlarm = normalizeAddress(alarmAddr);
+        if (!nLead || !nAlarm || nLead.length < 2 || nAlarm.length < 2) return false;
+        
+        if (nLead === nAlarm || nLead.includes(nAlarm) || nAlarm.includes(nLead)) return true;
+        
+        let blockMatch = nAlarm.match(/^(\d+)00\s+(?:blk|block)?\s*(.*)/);
+        if (blockMatch) {
+            let blockBase = blockMatch[1]; 
+            let street = blockMatch[2].trim(); 
+            let leadNumMatch = nLead.match(/^(\d+)/);
+            if (leadNumMatch) {
+                let leadNum = leadNumMatch[1]; 
+                if (leadNum.startsWith(blockBase) && leadNum.length === (blockBase.length + 2)) {
+                    if (street.length < 1) return true;
+                    if (nLead.includes(street) || street.includes(nLead.replace(leadNum, '').trim())) return true;
+                }
+            }
+        }
+        
+        let numLead = nLead.match(/^(\d+)/);
+        let numAlarm = nAlarm.match(/^(\d+)/);
+        if (numLead && numAlarm && numLead[1] === numAlarm[1]) {
+            let wordsLead = nLead.split(' ').filter(w => w.length > 0 && !/^\d+$/.test(w));
+            let wordsAlarm = nAlarm.split(' ').filter(w => w.length > 0 && !/^\d+$/.test(w));
+            for (let wl of wordsLead) {
+                for (let wa of wordsAlarm) {
+                    if (wl === wa) return true; 
+                }
+            }
+        }
+        return false;
     }
     
     function isWithin90DaysAnnual(dateStr) {
@@ -416,7 +450,7 @@
         return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
-    // LEAD IMPORTER
+    // CRM LEAD IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -442,7 +476,8 @@
                 if (!addressField) {
                     alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
                     document.getElementById('upload-group').style.display = 'flex';
-                    e.target.value = ''; return;
+                    e.target.value = '';
+                    return;
                 }
                 
                 let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
@@ -514,7 +549,7 @@
         });
     });
 
-    // ROBUST ALARM IMPORTER
+    // MUNICIPAL ALARM IMPORTER
     document.getElementById('alarm-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -531,18 +566,36 @@
             complete: function(results) {
                 let headers = results.meta.fields;
                 
-                // Advanced column identification
-                let addressField = headers.find(h => /address|street|location/i.test(h));
+                // Advanced column sniffing to find address data regardless of how the municipality named it
+                let addressField = headers.find(h => /address|street|location|incident|place/i.test(h));
                 if (!addressField) {
+                    let bestCount = -1;
                     for (let h of headers) {
-                        let sample = String(results.data[0][h] || '').trim();
-                        if (/^\d+\s+[a-zA-Z]/.test(sample)) { addressField = h; break; }
+                        let c = 0;
+                        for (let i=0; i<Math.min(5, results.data.length); i++) {
+                            let s = String(results.data[i][h] || '').trim();
+                            if (/^\d+\s+[a-zA-Z]/.test(s) || /\b(blk|block)\b/i.test(s)) c++;
+                        }
+                        if (c > bestCount) { bestCount = c; addressField = h; }
                     }
                 }
-                if(!addressField) addressField = headers[0];
+                if (!addressField) addressField = headers[0];
                 
-                let dateField = headers.find(h => /date|time/i.test(h)) || headers[1];
-                let notesField = headers.find(h => /note|description|detail|issue|reason|problem/i.test(h)) || headers[2];
+                let dateField = headers.find(h => /date|time|when/i.test(h));
+                if (!dateField) {
+                    let bestCount = -1;
+                    for (let h of headers) {
+                        let c = 0;
+                        for (let i=0; i<Math.min(5, results.data.length); i++) {
+                            let s = String(results.data[i][h] || '').trim();
+                            if (!isNaN(new Date(s)) && s.includes('/')) c++;
+                        }
+                        if (c > bestCount) { bestCount = c; dateField = h; }
+                    }
+                }
+                if (!dateField) dateField = headers[1] || headers[0];
+                
+                let notesField = headers.find(h => /note|description|detail|issue|reason|problem|type|call/i.test(h)) || headers[2] || headers[0];
 
                 let matchCount = 0;
                 let thirtyDaysAgo = new Date();
@@ -552,34 +605,28 @@
                     let rawAlarmAddress = extractTextData(row[addressField]);
                     if(!rawAlarmAddress) return;
                     
-                    // Route through the Normalization Engine to find true footprint
-                    let normalizedAlarmStr = normalizeAddress(rawAlarmAddress);
-                    if(normalizedAlarmStr.length < 4) return; // Prevent matching against empty strings
-
-                    // Search existing leads memory for an intersecting footprint
-                    let matchedAccount = allAccounts.find(acc => {
-                        let normalizedLeadStr = normalizeAddress(acc.Street_Address);
-                        return normalizedLeadStr.includes(normalizedAlarmStr) || normalizedAlarmStr.includes(normalizedLeadStr);
-                    });
+                    // Filter all existing accounts using the robust Fuzzy Matcher
+                    let matchedAccounts = allAccounts.filter(acc => addressesMatch(acc.Street_Address, rawAlarmAddress));
                     
-                    if (matchedAccount) {
-                        if (!matchedAccount.alarms) matchedAccount.alarms = [];
-                        
+                    if (matchedAccounts.length > 0) {
                         let alarmDateStr = extractTextData(row[dateField]);
                         let alarmNotes = extractTextData(row[notesField]);
-                        let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
                         
-                        if (!isDuplicate) {
-                            let isActive = false;
-                            try {
-                                let alarmDateObj = new Date(alarmDateStr);
-                                if (alarmDateObj >= thirtyDaysAgo) isActive = true;
-                            } catch(e) {}
+                        let isActive = false;
+                        let alarmDateObj = new Date(alarmDateStr);
+                        if (!isNaN(alarmDateObj) && alarmDateObj >= thirtyDaysAgo) isActive = true;
+                        
+                        // Tag every CRM lead that falls on the matching property block
+                        matchedAccounts.forEach(matchedAccount => {
+                            if (!matchedAccount.alarms) matchedAccount.alarms = [];
+                            let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
                             
-                            matchedAccount.alarms.push({ date: alarmDateStr, notes: alarmNotes, active: isActive });
-                            if (isActive) matchedAccount.hasActiveAlarm = true;
-                            matchCount++;
-                        }
+                            if (!isDuplicate) {
+                                matchedAccount.alarms.push({ date: alarmDateStr, notes: alarmNotes, active: isActive });
+                                if (isActive) matchedAccount.hasActiveAlarm = true;
+                                matchCount++;
+                            }
+                        });
                     }
                 });
                 
@@ -588,9 +635,9 @@
                 document.getElementById('loading-overlay').style.display = 'none';
                 
                 if (matchCount === 0) {
-                    alert("Import Complete: 0 matches found. No dispatch records aligned with your plotted CRM leads.");
+                    alert("Import Complete: 0 matches found. No dispatch records successfully aligned with your plotted CRM leads.");
                 } else {
-                    alert(`Successfully merged ${matchCount} alarm records into your existing territory map.`);
+                    alert(`Success: Linked ${matchCount} alarm events to your CRM territory map.`);
                 }
                 e.target.value = '';
             }
@@ -776,6 +823,7 @@
                 document.querySelector('.alarm-header').style.background = '#757575';
                 document.getElementById('alarm-count-badge').style.color = '#757575';
             }
+            
         } else {
             alarmContainer.style.display = 'none';
         }
