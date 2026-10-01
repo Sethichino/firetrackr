@@ -392,53 +392,82 @@
         return strVal;
     }
     
-    // THE FUZZY MATCHER ENGINE: Violently strips down addresses to fix CRM vs Municipal Log formatting errors
-    function fuzzyAddressMatch(addr1, addr2) {
-        if (!addr1 || !addr2) return false;
-        let a1 = addr1.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-        let a2 = addr2.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    // HYPER-AGGRESSIVE FUZZY MATCHER
+    function normalizeAddress(addr) {
+        if (!addr) return '';
+        let s = addr.toLowerCase();
         
-        if (a1 === a2) return true;
+        // Strip municipalities that might confuse a street name check
+        s = s.replace(/\b(austin|cedar park|leander|georgetown|round rock|pflugerville|lakeway|bee cave|manor|buda|kyle|san marcos|tx|texas)\b/g, '');
         
-        let num1Match = a1.match(/^(\d+)/);
-        let num2Match = a2.match(/^(\d+)/);
+        // Strip suites, apartments, units, buildings
+        s = s.replace(/(suite|ste|apt|unit|bldg|building|#|rm|room|floor|fl)\s*[\w\d-]+/i, '');
         
-        let base1 = num1Match ? num1Match[1] : '';
-        let base2 = num2Match ? num2Match[1] : '';
+        // Strip all punctuation
+        s = s.replace(/[^a-z0-9\s]/g, ' '); 
         
-        let isBlockMatch = false;
-        if (base1 && base2) {
-            if (base1 === base2) {
+        // Strip road types and standard directional indicators
+        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|loop|fm|rm|blk|block)\b/g, '');
+        
+        return s.replace(/\s+/g, ' ').trim();
+    }
+    
+    function fuzzyAddressMatch(leadAddr, alarmAddr) {
+        if (!leadAddr || !alarmAddr) return false;
+        
+        let l1 = normalizeAddress(leadAddr);
+        let a1 = normalizeAddress(alarmAddr);
+        
+        if (!l1 || !a1) return false;
+        
+        // Exact normalized match
+        if (l1 === a1 && l1.length > 1) return true;
+        
+        // Complete containment match (e.g. "1234 main" is contained in "1234 main plaza")
+        if (l1.length > 5 && a1.length > 5 && (l1.includes(a1) || a1.includes(l1))) return true;
+        
+        let numLead = l1.match(/^(\d+)/);
+        let numAlarm = a1.match(/^(\d+)/);
+        
+        if (numLead && numAlarm) {
+            let baseL = numLead[1];
+            let baseA = numAlarm[1];
+            
+            let isBlockMatch = false;
+            if (baseL === baseA) {
                 isBlockMatch = true;
-            } else if (base1.length >= 3 && base2.length >= 3 && base1.length === base2.length) {
-                if ((a1.includes('blk') || a1.includes('block') || base1.endsWith('00')) && base2.startsWith(base1.substring(0, base1.length - 2))) isBlockMatch = true;
-                if ((a2.includes('blk') || a2.includes('block') || base2.endsWith('00')) && base1.startsWith(base2.substring(0, base2.length - 2))) isBlockMatch = true;
-            }
-        }
-        
-        if (isBlockMatch) {
-            let stripWords = /\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|tx|texas|loop|fm|rm|blk|block|ste|suite|apt|unit|bldg|building)\b/g;
-            let words1 = a1.replace(stripWords, '').replace(/^\d+\s*/, '').trim().split(/\s+/).filter(w => w.length > 1);
-            let words2 = a2.replace(stripWords, '').replace(/^\d+\s*/, '').trim().split(/\s+/).filter(w => w.length > 1);
-            
-            for (let w of words1) {
-                if (words2.includes(w)) return true;
+            } else if (baseL.length >= 3 && baseA.length >= 3 && baseL.length === baseA.length) {
+                // E.g., 1234 vs 1200 Block
+                if (baseL.substring(0, baseL.length - 2) === baseA.substring(0, baseA.length - 2)) {
+                    if (alarmAddr.toLowerCase().includes('blk') || alarmAddr.toLowerCase().includes('block') || baseA.endsWith('00')) {
+                        isBlockMatch = true;
+                    }
+                }
             }
             
-            let w1nums = a1.match(/\b\d+\b/g) || [];
-            let w2nums = a2.match(/\b\d+\b/g) || [];
-            for (let n of w1nums) {
-                if (n !== base1 && w2nums.includes(n)) return true;
+            if (isBlockMatch) {
+                // If numbers match/block match, verify they share at least one significant word from the street name
+                let wordsL = l1.replace(/^\d+\s*/, '').split(/\s+/).filter(w => w.length > 1);
+                let wordsA = a1.replace(/^\d+\s*/, '').split(/\s+/).filter(w => w.length > 1);
+                
+                for (let w of wordsL) {
+                    if (wordsA.includes(w)) return true;
+                }
+                
+                // Allow matches if street numbers like "35" align
+                let numWordsL = l1.match(/\b\d+\b/g) || [];
+                let numWordsA = a1.match(/\b\d+\b/g) || [];
+                for(let n of numWordsL) {
+                    if (n !== baseL && numWordsA.includes(n)) return true;
+                }
             }
         }
         return false;
     }
 
-    // ROBUST DATE PARSER
     function parseActiveDate(dateStr, daysLimit) {
         if (!dateStr) return false;
         let d = new Date(dateStr);
-        
         if (isNaN(d)) {
             let match = String(dateStr).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
             if (match) {
@@ -446,9 +475,7 @@
                 d = new Date(`${year}-${match[1].padStart(2,'0')}-${match[2].padStart(2,'0')}T12:00:00`);
             }
         }
-        
         if (isNaN(d)) return false; 
-        
         let limitDate = new Date();
         limitDate.setDate(limitDate.getDate() - daysLimit);
         return d >= limitDate;
@@ -467,7 +494,7 @@
         return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
-    // CRM LEAD IMPORTER
+    // LEAD IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -565,7 +592,7 @@
         });
     });
 
-    // ALARM IMPORTER
+    // ROBUST ALARM IMPORTER
     document.getElementById('alarm-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -582,6 +609,7 @@
             complete: function(results) {
                 let headers = results.meta.fields;
                 
+                // Advanced column sniffing to find address data regardless of how the municipality named it
                 let addressField = headers.find(h => /address|street|location|incident|place/i.test(h));
                 if (!addressField) {
                     let bestCount = -1;
@@ -618,13 +646,18 @@
                     let rawAlarmAddress = extractTextData(row[addressField]);
                     if(!rawAlarmAddress || rawAlarmAddress.length < 3) return;
                     
-                    let matchedAccounts = allAccounts.filter(acc => fuzzyAddressMatch(acc.Street_Address, rawAlarmAddress));
+                    // Filter all existing accounts using the robust Fuzzy Matcher against both the short street and full combined address
+                    let matchedAccounts = allAccounts.filter(acc => {
+                        let fullCRMAddress = `${acc.Street_Address} ${acc['City, State, Zip']}`;
+                        return fuzzyAddressMatch(acc.Street_Address, rawAlarmAddress) || fuzzyAddressMatch(fullCRMAddress, rawAlarmAddress);
+                    });
                     
                     if (matchedAccounts.length > 0) {
                         let alarmDateStr = extractTextData(row[dateField]);
                         let alarmNotes = extractTextData(row[notesField]);
                         let isActive = parseActiveDate(alarmDateStr, 30);
                         
+                        // Tag every CRM lead that falls on the matching property block
                         matchedAccounts.forEach(matchedAccount => {
                             if (!matchedAccount.alarms) matchedAccount.alarms = [];
                             let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
@@ -735,7 +768,6 @@
         allAccounts.forEach(acc => {
             if (!acc.lat || !acc.lon) return;
             
-            // Re-evaluate inspections dynamically against today's date
             acc.hasUpcomingInspection = false;
             if (isWithin90DaysAnnual(acc.Inspection_Date)) acc.hasUpcomingInspection = true;
             if (acc.surveys && acc.surveys.length > 0) {
@@ -745,15 +777,16 @@
             }
 
             // CRITICAL FIX: The Filter Bypass
+            // If the user clicks the target filters, instantly bypass the distance slider 
+            // so they can see all matched alarms across their entire territory.
             let isHighPriorityTarget = false;
             if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
                 if (showActiveAlarmsOnly && acc.hasActiveAlarm) isHighPriorityTarget = true;
                 if (showUpcomingInspectionsOnly && acc.hasUpcomingInspection) isHighPriorityTarget = true;
                 
-                // If filters are active, ignore leads that don't match the specific criteria
                 if (!isHighPriorityTarget) return; 
             } else {
-                // If no filters are active, respect the normal radius slider
+                // If filters are OFF, respect the distance slider
                 let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
                 if (distance > radius) return;
             }
@@ -775,7 +808,6 @@
         });
 
         if (matchCount > 0) {
-            // Auto-zoom to fit the high-priority leads if the user hits the toggle switch
             if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
                 map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
             } else {
@@ -844,7 +876,6 @@
                 document.querySelector('.alarm-header').style.background = '#757575';
                 document.getElementById('alarm-count-badge').style.color = '#757575';
             }
-            
         } else {
             alarmContainer.style.display = 'none';
         }
