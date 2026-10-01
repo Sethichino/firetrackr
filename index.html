@@ -393,48 +393,65 @@
     }
     
     // THE FUZZY MATCHER ENGINE: Violently strips down addresses to fix CRM vs Municipal Log formatting errors
-    function normalizeAddress(addr) {
-        if (!addr) return '';
-        let s = addr.toLowerCase();
-        s = s.replace(/(suite|ste|apt|unit|bldg|building|#|rm|room|floor|fl)\s*[\w\d-]+/i, '');
-        s = s.replace(/[^a-z0-9\s]/g, ' '); 
-        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|tx|texas|loop|fm|rm)\b/g, '');
-        return s.replace(/\s+/g, ' ').trim();
-    }
-    
-    function addressesMatch(leadAddr, alarmAddr) {
-        let nLead = normalizeAddress(leadAddr);
-        let nAlarm = normalizeAddress(alarmAddr);
-        if (!nLead || !nAlarm || nLead.length < 2 || nAlarm.length < 2) return false;
+    function fuzzyAddressMatch(addr1, addr2) {
+        if (!addr1 || !addr2) return false;
+        let a1 = addr1.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+        let a2 = addr2.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
         
-        if (nLead === nAlarm || nLead.includes(nAlarm) || nAlarm.includes(nLead)) return true;
+        if (a1 === a2) return true;
         
-        let blockMatch = nAlarm.match(/^(\d+)00\s+(?:blk|block)?\s*(.*)/);
-        if (blockMatch) {
-            let blockBase = blockMatch[1]; 
-            let street = blockMatch[2].trim(); 
-            let leadNumMatch = nLead.match(/^(\d+)/);
-            if (leadNumMatch) {
-                let leadNum = leadNumMatch[1]; 
-                if (leadNum.startsWith(blockBase) && leadNum.length === (blockBase.length + 2)) {
-                    if (street.length < 1) return true;
-                    if (nLead.includes(street) || street.includes(nLead.replace(leadNum, '').trim())) return true;
-                }
+        let num1Match = a1.match(/^(\d+)/);
+        let num2Match = a2.match(/^(\d+)/);
+        
+        let base1 = num1Match ? num1Match[1] : '';
+        let base2 = num2Match ? num2Match[1] : '';
+        
+        let isBlockMatch = false;
+        if (base1 && base2) {
+            if (base1 === base2) {
+                isBlockMatch = true;
+            } else if (base1.length >= 3 && base2.length >= 3 && base1.length === base2.length) {
+                if ((a1.includes('blk') || a1.includes('block') || base1.endsWith('00')) && base2.startsWith(base1.substring(0, base1.length - 2))) isBlockMatch = true;
+                if ((a2.includes('blk') || a2.includes('block') || base2.endsWith('00')) && base1.startsWith(base2.substring(0, base2.length - 2))) isBlockMatch = true;
             }
         }
         
-        let numLead = nLead.match(/^(\d+)/);
-        let numAlarm = nAlarm.match(/^(\d+)/);
-        if (numLead && numAlarm && numLead[1] === numAlarm[1]) {
-            let wordsLead = nLead.split(' ').filter(w => w.length > 0 && !/^\d+$/.test(w));
-            let wordsAlarm = nAlarm.split(' ').filter(w => w.length > 0 && !/^\d+$/.test(w));
-            for (let wl of wordsLead) {
-                for (let wa of wordsAlarm) {
-                    if (wl === wa) return true; 
-                }
+        if (isBlockMatch) {
+            let stripWords = /\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|tx|texas|loop|fm|rm|blk|block|ste|suite|apt|unit|bldg|building)\b/g;
+            let words1 = a1.replace(stripWords, '').replace(/^\d+\s*/, '').trim().split(/\s+/).filter(w => w.length > 1);
+            let words2 = a2.replace(stripWords, '').replace(/^\d+\s*/, '').trim().split(/\s+/).filter(w => w.length > 1);
+            
+            for (let w of words1) {
+                if (words2.includes(w)) return true;
+            }
+            
+            let w1nums = a1.match(/\b\d+\b/g) || [];
+            let w2nums = a2.match(/\b\d+\b/g) || [];
+            for (let n of w1nums) {
+                if (n !== base1 && w2nums.includes(n)) return true;
             }
         }
         return false;
+    }
+
+    // ROBUST DATE PARSER
+    function parseActiveDate(dateStr, daysLimit) {
+        if (!dateStr) return false;
+        let d = new Date(dateStr);
+        
+        if (isNaN(d)) {
+            let match = String(dateStr).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+            if (match) {
+                let year = match[3].length === 2 ? "20" + match[3] : match[3];
+                d = new Date(`${year}-${match[1].padStart(2,'0')}-${match[2].padStart(2,'0')}T12:00:00`);
+            }
+        }
+        
+        if (isNaN(d)) return false; 
+        
+        let limitDate = new Date();
+        limitDate.setDate(limitDate.getDate() - daysLimit);
+        return d >= limitDate;
     }
     
     function isWithin90DaysAnnual(dateStr) {
@@ -476,8 +493,7 @@
                 if (!addressField) {
                     alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
                     document.getElementById('upload-group').style.display = 'flex';
-                    e.target.value = '';
-                    return;
+                    e.target.value = ''; return;
                 }
                 
                 let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
@@ -549,7 +565,7 @@
         });
     });
 
-    // MUNICIPAL ALARM IMPORTER
+    // ALARM IMPORTER
     document.getElementById('alarm-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -566,7 +582,6 @@
             complete: function(results) {
                 let headers = results.meta.fields;
                 
-                // Advanced column sniffing to find address data regardless of how the municipality named it
                 let addressField = headers.find(h => /address|street|location|incident|place/i.test(h));
                 if (!addressField) {
                     let bestCount = -1;
@@ -581,7 +596,7 @@
                 }
                 if (!addressField) addressField = headers[0];
                 
-                let dateField = headers.find(h => /date|time|when/i.test(h));
+                let dateField = headers.find(h => /date|time|when|occured|reported/i.test(h));
                 if (!dateField) {
                     let bestCount = -1;
                     for (let h of headers) {
@@ -598,25 +613,18 @@
                 let notesField = headers.find(h => /note|description|detail|issue|reason|problem|type|call/i.test(h)) || headers[2] || headers[0];
 
                 let matchCount = 0;
-                let thirtyDaysAgo = new Date();
-                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
                 results.data.forEach(row => {
                     let rawAlarmAddress = extractTextData(row[addressField]);
-                    if(!rawAlarmAddress) return;
+                    if(!rawAlarmAddress || rawAlarmAddress.length < 3) return;
                     
-                    // Filter all existing accounts using the robust Fuzzy Matcher
-                    let matchedAccounts = allAccounts.filter(acc => addressesMatch(acc.Street_Address, rawAlarmAddress));
+                    let matchedAccounts = allAccounts.filter(acc => fuzzyAddressMatch(acc.Street_Address, rawAlarmAddress));
                     
                     if (matchedAccounts.length > 0) {
                         let alarmDateStr = extractTextData(row[dateField]);
                         let alarmNotes = extractTextData(row[notesField]);
+                        let isActive = parseActiveDate(alarmDateStr, 30);
                         
-                        let isActive = false;
-                        let alarmDateObj = new Date(alarmDateStr);
-                        if (!isNaN(alarmDateObj) && alarmDateObj >= thirtyDaysAgo) isActive = true;
-                        
-                        // Tag every CRM lead that falls on the matching property block
                         matchedAccounts.forEach(matchedAccount => {
                             if (!matchedAccount.alarms) matchedAccount.alarms = [];
                             let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
@@ -726,9 +734,8 @@
 
         allAccounts.forEach(acc => {
             if (!acc.lat || !acc.lon) return;
-            let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
-            if (distance > radius) return;
             
+            // Re-evaluate inspections dynamically against today's date
             acc.hasUpcomingInspection = false;
             if (isWithin90DaysAnnual(acc.Inspection_Date)) acc.hasUpcomingInspection = true;
             if (acc.surveys && acc.surveys.length > 0) {
@@ -737,12 +744,18 @@
                 });
             }
 
-            if (showActiveAlarmsOnly && showUpcomingInspectionsOnly) {
-                if (!acc.hasActiveAlarm && !acc.hasUpcomingInspection) return;
-            } else if (showActiveAlarmsOnly && !acc.hasActiveAlarm) {
-                return;
-            } else if (showUpcomingInspectionsOnly && !acc.hasUpcomingInspection) {
-                return;
+            // CRITICAL FIX: The Filter Bypass
+            let isHighPriorityTarget = false;
+            if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
+                if (showActiveAlarmsOnly && acc.hasActiveAlarm) isHighPriorityTarget = true;
+                if (showUpcomingInspectionsOnly && acc.hasUpcomingInspection) isHighPriorityTarget = true;
+                
+                // If filters are active, ignore leads that don't match the specific criteria
+                if (!isHighPriorityTarget) return; 
+            } else {
+                // If no filters are active, respect the normal radius slider
+                let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
+                if (distance > radius) return;
             }
             
             let pinIcon = defaultIcon;
@@ -755,14 +768,22 @@
             }
             
             let marker = L.marker([acc.lat, acc.lon], { icon: pinIcon });
-            marker.on('click', () => showDetails(acc, distance));
+            marker.on('click', () => showDetails(acc, calculateDistance(userLat, userLon, acc.lat, acc.lon)));
             markersLayer.addLayer(marker);
             bounds.extend([acc.lat, acc.lon]);
             matchCount++;
         });
 
-        if (matchCount > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-        else map.setView([userLat, userLon], 10);
+        if (matchCount > 0) {
+            // Auto-zoom to fit the high-priority leads if the user hits the toggle switch
+            if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
+                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+            } else {
+                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+            }
+        } else {
+            map.setView([userLat, userLon], 10);
+        }
     }
 
     function showDetails(acc, distance) {
