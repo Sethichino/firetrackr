@@ -154,7 +154,6 @@
             </div>
         </div>
         
-        <!-- NEW: Priority Map Filters -->
         <div style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px;">
             <div class="control-group" style="align-items: center;">
                 <label style="margin-bottom: 4px; color: #d32f2f; font-size: 0.8rem; font-weight: bold;">🚒 Alarms (30d)</label>
@@ -237,7 +236,6 @@
         </div>
     </div>
     
-    <!-- NEW: Displays CRM level Inspection Date on the info card -->
     <div class="info-item" id="sheet-insp-container" style="margin-bottom: 15px; display: none; background: #fff3e0; padding: 8px; border-radius: 6px; border: 1px solid #ffe0b2;">
         <strong style="color: #f57c00;">Upcoming Inspection Date (CRM)</strong>
         <span id="sheet-insp-date">N/A</span>
@@ -317,13 +315,11 @@
         iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
     });
     
-    // Icon for Active Alarms (30 Days)
     const fireTruckIcon = L.divIcon({
         html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🚒</div>',
         className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
     });
     
-    // Icon for Upcoming Inspections (90 Days Rolling)
     const fireIcon = L.divIcon({
         html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🔥</div>',
         className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
@@ -396,23 +392,27 @@
         return strVal;
     }
     
-    // ROLLING ANNIVERSARY ENGINE: Evaluates any mm/dd/yyyy and checks if its annual anniversary falls within 90 days of today
+    // NEW STRING NORMALIZATION ENGINE
+    // Strips away formatting differences between Microsoft Dynamics and City Dispatch systems
+    function normalizeAddress(addr) {
+        if (!addr) return '';
+        let s = addr.toLowerCase();
+        s = s.replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '');
+        s = s.replace(/[^a-z0-9\s]/g, ' '); // Strip punctuation
+        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west)\b/g, '');
+        return s.replace(/\s+/g, ' ').trim();
+    }
+    
     function isWithin90DaysAnnual(dateStr) {
         if (!dateStr) return false;
         let d = new Date(dateStr);
         if (isNaN(d)) return false;
-        
         let today = new Date();
         today.setHours(0,0,0,0);
-        
-        // Treat the date as an anniversary for the current year
         let thisYearAnniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-        // Calculate next year's anniversary to capture Nov/Dec overlapping into Jan/Feb
         let nextYearAnniv = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
-        
         let diffThisYear = (thisYearAnniv - today) / (1000 * 60 * 60 * 24);
         let diffNextYear = (nextYearAnniv - today) / (1000 * 60 * 60 * 24);
-        
         return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
@@ -427,7 +427,6 @@
                 if (results.data.length === 0) return;
                 
                 let headers = results.meta.fields;
-                
                 let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
                 
                 let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
@@ -443,8 +442,7 @@
                 if (!addressField) {
                     alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
                     document.getElementById('upload-group').style.display = 'flex';
-                    e.target.value = '';
-                    return;
+                    e.target.value = ''; return;
                 }
                 
                 let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
@@ -453,8 +451,6 @@
                 let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
                 let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name|last name/i.test(h));
                 let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
-                
-                // NEW: Job Title and Inspection Date extractors
                 let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
                 let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
 
@@ -518,39 +514,53 @@
         });
     });
 
-    // ALARM IMPORTER
+    // ROBUST ALARM IMPORTER
     document.getElementById('alarm-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
         if (allAccounts.length === 0) {
             alert("Please import your standard CRM leads first so we have addresses to attach the alarms to.");
-            e.target.value = '';
-            return;
+            e.target.value = ''; return;
         }
 
         document.getElementById('loading-overlay').style.display = 'flex';
-        document.getElementById('loading-text').innerText = `Processing Alarm History...`;
+        document.getElementById('loading-text').innerText = `Merging Dispatch Logs...`;
 
         Papa.parse(file, {
             header: true, skipEmptyLines: true,
             complete: function(results) {
                 let headers = results.meta.fields;
                 
-                let addressField = headers.find(h => /address|street|location/i.test(h)) || headers[0];
+                // Advanced column identification
+                let addressField = headers.find(h => /address|street|location/i.test(h));
+                if (!addressField) {
+                    for (let h of headers) {
+                        let sample = String(results.data[0][h] || '').trim();
+                        if (/^\d+\s+[a-zA-Z]/.test(sample)) { addressField = h; break; }
+                    }
+                }
+                if(!addressField) addressField = headers[0];
+                
                 let dateField = headers.find(h => /date|time/i.test(h)) || headers[1];
-                let notesField = headers.find(h => /note|description|detail|issue/i.test(h)) || headers[2];
+                let notesField = headers.find(h => /note|description|detail|issue|reason|problem/i.test(h)) || headers[2];
 
                 let matchCount = 0;
                 let thirtyDaysAgo = new Date();
                 thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
                 results.data.forEach(row => {
-                    let rawAddress = extractTextData(row[addressField]).toLowerCase();
-                    if(!rawAddress) return;
+                    let rawAlarmAddress = extractTextData(row[addressField]);
+                    if(!rawAlarmAddress) return;
                     
-                    let cleanAlarmStreet = rawAddress.replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
+                    // Route through the Normalization Engine to find true footprint
+                    let normalizedAlarmStr = normalizeAddress(rawAlarmAddress);
+                    if(normalizedAlarmStr.length < 4) return; // Prevent matching against empty strings
 
-                    let matchedAccount = allAccounts.find(acc => acc.Street_Address.toLowerCase().includes(cleanAlarmStreet) || cleanAlarmStreet.includes(acc.Street_Address.toLowerCase()));
+                    // Search existing leads memory for an intersecting footprint
+                    let matchedAccount = allAccounts.find(acc => {
+                        let normalizedLeadStr = normalizeAddress(acc.Street_Address);
+                        return normalizedLeadStr.includes(normalizedAlarmStr) || normalizedAlarmStr.includes(normalizedLeadStr);
+                    });
                     
                     if (matchedAccount) {
                         if (!matchedAccount.alarms) matchedAccount.alarms = [];
@@ -575,9 +585,13 @@
                 
                 localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
                 filterMap();
-                
                 document.getElementById('loading-overlay').style.display = 'none';
-                alert(`Successfully merged ${matchCount} new alarm records into your existing territory map.`);
+                
+                if (matchCount === 0) {
+                    alert("Import Complete: 0 matches found. No dispatch records aligned with your plotted CRM leads.");
+                } else {
+                    alert(`Successfully merged ${matchCount} alarm records into your existing territory map.`);
+                }
                 e.target.value = '';
             }
         });
@@ -668,7 +682,6 @@
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
             
-            // Dynamic check for 90-day upcoming inspections based on current date
             acc.hasUpcomingInspection = false;
             if (isWithin90DaysAnnual(acc.Inspection_Date)) acc.hasUpcomingInspection = true;
             if (acc.surveys && acc.surveys.length > 0) {
@@ -677,7 +690,6 @@
                 });
             }
 
-            // Logic to handle the dual filter toggles
             if (showActiveAlarmsOnly && showUpcomingInspectionsOnly) {
                 if (!acc.hasActiveAlarm && !acc.hasUpcomingInspection) return;
             } else if (showActiveAlarmsOnly && !acc.hasActiveAlarm) {
@@ -686,7 +698,6 @@
                 return;
             }
             
-            // Marker Priority: Alarm Truck > Inspection Fire > Visited > Default
             let pinIcon = defaultIcon;
             if (acc.hasActiveAlarm) {
                 pinIcon = fireTruckIcon; 
@@ -717,7 +728,6 @@
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
         
-        // NEW: Job Title UI logic
         let titleElem = document.getElementById('sheet-job-title');
         if (acc.Job_Title) {
             titleElem.style.display = 'block';
@@ -726,7 +736,6 @@
             titleElem.style.display = 'none';
         }
         
-        // NEW: CRM Inspection Date UI logic
         let inspContainer = document.getElementById('sheet-insp-container');
         if (acc.Inspection_Date) {
             inspContainer.style.display = 'block';
@@ -767,7 +776,6 @@
                 document.querySelector('.alarm-header').style.background = '#757575';
                 document.getElementById('alarm-count-badge').style.color = '#757575';
             }
-            
         } else {
             alarmContainer.style.display = 'none';
         }
@@ -812,7 +820,6 @@
     function closeSurvey() {
         document.getElementById('survey-modal').classList.remove('active');
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-        // Force the map to re-evaluate the fire icons when the survey closes in case the dates were updated
         filterMap(); 
     }
 
@@ -1024,7 +1031,6 @@
             pdfHtml += `</ul></div>`;
         }
 
-        // Appended Standard Corporate Signature Required by Internal Guidelines
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
@@ -1076,7 +1082,6 @@
             body += `\n=================================\n\n`;
         });
         
-        // Exact Corporate Signature requirement
         body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
