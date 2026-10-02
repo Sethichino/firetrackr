@@ -130,8 +130,8 @@
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
             
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Leads</button>
-                <button onclick="document.getElementById('alarm-file').click()" style="flex: 1; padding: 12px; background: #d32f2f; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">🔥 Import Alarms</button>
+                <!-- Consolidated single upload button -->
+                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Master CSV</button>
             </div>
             
             <div style="display: flex; gap: 8px;">
@@ -141,11 +141,9 @@
         </div>
 
         <div class="control-group" id="upload-group">
-            <label>Upload CRM Export (CSV)</label>
+            <label>Upload Master Leads & Alarms (CSV)</label>
             <input type="file" id="csv-file" accept=".csv">
         </div>
-        
-        <input type="file" id="alarm-file" accept=".csv" style="display:none;">
         
         <div class="row">
             <div class="control-group" style="flex: 1;">
@@ -361,7 +359,6 @@
             document.getElementById('upload-group').style.display = 'flex';
             document.getElementById('data-status-container').style.display = 'none';
             document.getElementById('csv-file').value = '';
-            document.getElementById('alarm-file').value = '';
             map.setView([userLat, userLon], 10);
             closeSheet();
         }
@@ -392,79 +389,6 @@
         return strVal;
     }
     
-    // HYPER-AGGRESSIVE FUZZY MATCHER
-    function normalizeAddress(addr) {
-        if (!addr) return '';
-        let s = addr.toLowerCase();
-        
-        // Strip municipalities that might confuse a street name check
-        s = s.replace(/\b(austin|cedar park|leander|georgetown|round rock|pflugerville|lakeway|bee cave|manor|buda|kyle|san marcos|tx|texas)\b/g, '');
-        
-        // Strip suites, apartments, units, buildings
-        s = s.replace(/(suite|ste|apt|unit|bldg|building|#|rm|room|floor|fl)\s*[\w\d-]+/i, '');
-        
-        // Strip all punctuation
-        s = s.replace(/[^a-z0-9\s]/g, ' '); 
-        
-        // Strip road types and standard directional indicators
-        s = s.replace(/\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|ln|lane|ct|court|pkwy|parkway|hwy|highway|n|s|e|w|north|south|east|west|ih|i|us|interstate|loop|fm|rm|blk|block)\b/g, '');
-        
-        return s.replace(/\s+/g, ' ').trim();
-    }
-    
-    function fuzzyAddressMatch(leadAddr, alarmAddr) {
-        if (!leadAddr || !alarmAddr) return false;
-        
-        let l1 = normalizeAddress(leadAddr);
-        let a1 = normalizeAddress(alarmAddr);
-        
-        if (!l1 || !a1) return false;
-        
-        // Exact normalized match
-        if (l1 === a1 && l1.length > 1) return true;
-        
-        // Complete containment match (e.g. "1234 main" is contained in "1234 main plaza")
-        if (l1.length > 5 && a1.length > 5 && (l1.includes(a1) || a1.includes(l1))) return true;
-        
-        let numLead = l1.match(/^(\d+)/);
-        let numAlarm = a1.match(/^(\d+)/);
-        
-        if (numLead && numAlarm) {
-            let baseL = numLead[1];
-            let baseA = numAlarm[1];
-            
-            let isBlockMatch = false;
-            if (baseL === baseA) {
-                isBlockMatch = true;
-            } else if (baseL.length >= 3 && baseA.length >= 3 && baseL.length === baseA.length) {
-                // E.g., 1234 vs 1200 Block
-                if (baseL.substring(0, baseL.length - 2) === baseA.substring(0, baseA.length - 2)) {
-                    if (alarmAddr.toLowerCase().includes('blk') || alarmAddr.toLowerCase().includes('block') || baseA.endsWith('00')) {
-                        isBlockMatch = true;
-                    }
-                }
-            }
-            
-            if (isBlockMatch) {
-                // If numbers match/block match, verify they share at least one significant word from the street name
-                let wordsL = l1.replace(/^\d+\s*/, '').split(/\s+/).filter(w => w.length > 1);
-                let wordsA = a1.replace(/^\d+\s*/, '').split(/\s+/).filter(w => w.length > 1);
-                
-                for (let w of wordsL) {
-                    if (wordsA.includes(w)) return true;
-                }
-                
-                // Allow matches if street numbers like "35" align
-                let numWordsL = l1.match(/\b\d+\b/g) || [];
-                let numWordsA = a1.match(/\b\d+\b/g) || [];
-                for(let n of numWordsL) {
-                    if (n !== baseL && numWordsA.includes(n)) return true;
-                }
-            }
-        }
-        return false;
-    }
-
     function parseActiveDate(dateStr, daysLimit) {
         if (!dateStr) return false;
         let d = new Date(dateStr);
@@ -480,7 +404,7 @@
         limitDate.setDate(limitDate.getDate() - daysLimit);
         return d >= limitDate;
     }
-    
+
     function isWithin90DaysAnnual(dateStr) {
         if (!dateStr) return false;
         let d = new Date(dateStr);
@@ -494,7 +418,7 @@
         return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
-    // LEAD IMPORTER
+    // CONSOLIDATED MASTER IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
@@ -518,7 +442,7 @@
                 }
                 
                 if (!addressField) {
-                    alert("Missing Address Data: We could not find a Street Address column. Please ensure your Dynamics CRM export view actually has the Street, City, and State columns visible before exporting.");
+                    alert("Missing Address Data: We could not find a Street Address column.");
                     document.getElementById('upload-group').style.display = 'flex';
                     e.target.value = ''; return;
                 }
@@ -531,6 +455,10 @@
                 let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
                 let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
                 let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
+                
+                // NEW: Sniff for Alarm Columns embedded directly in the master sheet
+                let alarmDateField = validHeaders.find(h => /alarm date|incident date|dispatch date/i.test(h));
+                let alarmNotesField = validHeaders.find(h => /alarm note|incident note|dispatch note|alarm desc/i.test(h));
 
                 let newOrUpdatedAccounts = [];
 
@@ -555,22 +483,45 @@
                         
                         extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
                         
+                        // Extract embedded alarm data if columns exist
+                        let extractedAlarmDate = alarmDateField ? extractTextData(row[alarmDateField]) : '';
+                        let extractedAlarmNotes = alarmNotesField ? extractTextData(row[alarmNotesField]) : '';
+                        
                         if (existingIndex >= 0) {
                             if (contactField) allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
                             if (titleField) allAccounts[existingIndex].Job_Title = extractTextData(row[titleField]) || allAccounts[existingIndex].Job_Title;
                             if (phoneField) allAccounts[existingIndex].Phone = extractTextData(row[phoneField]) || allAccounts[existingIndex].Phone;
                             if (dateField) allAccounts[existingIndex].Inspection_Date = extractTextData(row[dateField]) || allAccounts[existingIndex].Inspection_Date;
                             allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
+                            
+                            // Upsert the embedded alarm into the existing account
+                            if (extractedAlarmDate) {
+                                let isActive = parseActiveDate(extractedAlarmDate, 30);
+                                let isDuplicate = allAccounts[existingIndex].alarms.some(a => a.date === extractedAlarmDate && a.notes === extractedAlarmNotes);
+                                if (!isDuplicate) {
+                                    allAccounts[existingIndex].alarms.push({ date: extractedAlarmDate, notes: extractedAlarmNotes, active: isActive });
+                                    if (isActive) allAccounts[existingIndex].hasActiveAlarm = true;
+                                }
+                            }
                         } else {
-                            newOrUpdatedAccounts.push({
+                            let newAcc = {
                                 id: key, Business_Name: bizName, Street_Address: street,
                                 'City, State, Zip': extractedCityStateZip, 
                                 Contact_Name: contactField ? extractTextData(row[contactField]) : '',
                                 Job_Title: titleField ? extractTextData(row[titleField]) : '',
                                 Phone: phoneField ? extractTextData(row[phoneField]) : '', 
                                 Inspection_Date: dateField ? extractTextData(row[dateField]) : '',
-                                visited: false, surveys: [], alarms: []
-                            });
+                                visited: false, surveys: [], alarms: [], hasActiveAlarm: false
+                            };
+                            
+                            // Push the first embedded alarm to the new account
+                            if (extractedAlarmDate) {
+                                let isActive = parseActiveDate(extractedAlarmDate, 30);
+                                newAcc.alarms.push({ date: extractedAlarmDate, notes: extractedAlarmNotes, active: isActive });
+                                if (isActive) newAcc.hasActiveAlarm = true;
+                            }
+                            
+                            newOrUpdatedAccounts.push(newAcc);
                         }
                     }
                 });
@@ -587,99 +538,6 @@
                 document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
                 
                 filterMap();
-                e.target.value = '';
-            }
-        });
-    });
-
-    // ROBUST ALARM IMPORTER
-    document.getElementById('alarm-file').addEventListener('change', function(e) {
-        let file = e.target.files[0];
-        if (!file) return;
-        if (allAccounts.length === 0) {
-            alert("Please import your standard CRM leads first so we have addresses to attach the alarms to.");
-            e.target.value = ''; return;
-        }
-
-        document.getElementById('loading-overlay').style.display = 'flex';
-        document.getElementById('loading-text').innerText = `Merging Dispatch Logs...`;
-
-        Papa.parse(file, {
-            header: true, skipEmptyLines: true,
-            complete: function(results) {
-                let headers = results.meta.fields;
-                
-                // Advanced column sniffing to find address data regardless of how the municipality named it
-                let addressField = headers.find(h => /address|street|location|incident|place/i.test(h));
-                if (!addressField) {
-                    let bestCount = -1;
-                    for (let h of headers) {
-                        let c = 0;
-                        for (let i=0; i<Math.min(5, results.data.length); i++) {
-                            let s = String(results.data[i][h] || '').trim();
-                            if (/^\d+\s+[a-zA-Z]/.test(s) || /\b(blk|block)\b/i.test(s)) c++;
-                        }
-                        if (c > bestCount) { bestCount = c; addressField = h; }
-                    }
-                }
-                if (!addressField) addressField = headers[0];
-                
-                let dateField = headers.find(h => /date|time|when|occured|reported/i.test(h));
-                if (!dateField) {
-                    let bestCount = -1;
-                    for (let h of headers) {
-                        let c = 0;
-                        for (let i=0; i<Math.min(5, results.data.length); i++) {
-                            let s = String(results.data[i][h] || '').trim();
-                            if (!isNaN(new Date(s)) && s.includes('/')) c++;
-                        }
-                        if (c > bestCount) { bestCount = c; dateField = h; }
-                    }
-                }
-                if (!dateField) dateField = headers[1] || headers[0];
-                
-                let notesField = headers.find(h => /note|description|detail|issue|reason|problem|type|call/i.test(h)) || headers[2] || headers[0];
-
-                let matchCount = 0;
-
-                results.data.forEach(row => {
-                    let rawAlarmAddress = extractTextData(row[addressField]);
-                    if(!rawAlarmAddress || rawAlarmAddress.length < 3) return;
-                    
-                    // Filter all existing accounts using the robust Fuzzy Matcher against both the short street and full combined address
-                    let matchedAccounts = allAccounts.filter(acc => {
-                        let fullCRMAddress = `${acc.Street_Address} ${acc['City, State, Zip']}`;
-                        return fuzzyAddressMatch(acc.Street_Address, rawAlarmAddress) || fuzzyAddressMatch(fullCRMAddress, rawAlarmAddress);
-                    });
-                    
-                    if (matchedAccounts.length > 0) {
-                        let alarmDateStr = extractTextData(row[dateField]);
-                        let alarmNotes = extractTextData(row[notesField]);
-                        let isActive = parseActiveDate(alarmDateStr, 30);
-                        
-                        // Tag every CRM lead that falls on the matching property block
-                        matchedAccounts.forEach(matchedAccount => {
-                            if (!matchedAccount.alarms) matchedAccount.alarms = [];
-                            let isDuplicate = matchedAccount.alarms.some(a => a.date === alarmDateStr && a.notes === alarmNotes);
-                            
-                            if (!isDuplicate) {
-                                matchedAccount.alarms.push({ date: alarmDateStr, notes: alarmNotes, active: isActive });
-                                if (isActive) matchedAccount.hasActiveAlarm = true;
-                                matchCount++;
-                            }
-                        });
-                    }
-                });
-                
-                localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-                filterMap();
-                document.getElementById('loading-overlay').style.display = 'none';
-                
-                if (matchCount === 0) {
-                    alert("Import Complete: 0 matches found. No dispatch records successfully aligned with your plotted CRM leads.");
-                } else {
-                    alert(`Success: Linked ${matchCount} alarm events to your CRM territory map.`);
-                }
                 e.target.value = '';
             }
         });
@@ -776,9 +634,6 @@
                 });
             }
 
-            // CRITICAL FIX: The Filter Bypass
-            // If the user clicks the target filters, instantly bypass the distance slider 
-            // so they can see all matched alarms across their entire territory.
             let isHighPriorityTarget = false;
             if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
                 if (showActiveAlarmsOnly && acc.hasActiveAlarm) isHighPriorityTarget = true;
@@ -786,7 +641,6 @@
                 
                 if (!isHighPriorityTarget) return; 
             } else {
-                // If filters are OFF, respect the distance slider
                 let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
                 if (distance > radius) return;
             }
@@ -876,6 +730,7 @@
                 document.querySelector('.alarm-header').style.background = '#757575';
                 document.getElementById('alarm-count-badge').style.color = '#757575';
             }
+            
         } else {
             alarmContainer.style.display = 'none';
         }
@@ -1131,6 +986,7 @@
             pdfHtml += `</ul></div>`;
         }
 
+        // Standard Corporate Signature Format
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
