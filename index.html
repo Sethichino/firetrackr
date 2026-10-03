@@ -130,7 +130,6 @@
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
             
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <!-- Consolidated single upload button -->
                 <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Master CSV</button>
             </div>
             
@@ -141,7 +140,7 @@
         </div>
 
         <div class="control-group" id="upload-group">
-            <label>Upload Master Leads & Alarms (CSV)</label>
+            <label>Upload Master CSV</label>
             <input type="file" id="csv-file" accept=".csv">
         </div>
         
@@ -456,9 +455,9 @@
                 let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
                 let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
                 
-                // NEW: Sniff for Alarm Columns embedded directly in the master sheet
-                let alarmDateField = validHeaders.find(h => /alarm date|incident date|dispatch date/i.test(h));
-                let alarmNotesField = validHeaders.find(h => /alarm note|incident note|dispatch note|alarm desc/i.test(h));
+                // Read the Alarm fields added by the Merger Tool
+                let alarmDateField = validHeaders.find(h => /alarm date/i.test(h));
+                let alarmNotesField = validHeaders.find(h => /alarm note/i.test(h));
 
                 let newOrUpdatedAccounts = [];
 
@@ -483,7 +482,6 @@
                         
                         extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
                         
-                        // Extract embedded alarm data if columns exist
                         let extractedAlarmDate = alarmDateField ? extractTextData(row[alarmDateField]) : '';
                         let extractedAlarmNotes = alarmNotesField ? extractTextData(row[alarmNotesField]) : '';
                         
@@ -494,7 +492,6 @@
                             if (dateField) allAccounts[existingIndex].Inspection_Date = extractTextData(row[dateField]) || allAccounts[existingIndex].Inspection_Date;
                             allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
                             
-                            // Upsert the embedded alarm into the existing account
                             if (extractedAlarmDate) {
                                 let isActive = parseActiveDate(extractedAlarmDate, 30);
                                 let isDuplicate = allAccounts[existingIndex].alarms.some(a => a.date === extractedAlarmDate && a.notes === extractedAlarmNotes);
@@ -514,7 +511,6 @@
                                 visited: false, surveys: [], alarms: [], hasActiveAlarm: false
                             };
                             
-                            // Push the first embedded alarm to the new account
                             if (extractedAlarmDate) {
                                 let isActive = parseActiveDate(extractedAlarmDate, 30);
                                 newAcc.alarms.push({ date: extractedAlarmDate, notes: extractedAlarmNotes, active: isActive });
@@ -638,7 +634,6 @@
             if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
                 if (showActiveAlarmsOnly && acc.hasActiveAlarm) isHighPriorityTarget = true;
                 if (showUpcomingInspectionsOnly && acc.hasUpcomingInspection) isHighPriorityTarget = true;
-                
                 if (!isHighPriorityTarget) return; 
             } else {
                 let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
@@ -730,7 +725,6 @@
                 document.querySelector('.alarm-header').style.background = '#757575';
                 document.getElementById('alarm-count-badge').style.color = '#757575';
             }
-            
         } else {
             alarmContainer.style.display = 'none';
         }
@@ -986,7 +980,6 @@
             pdfHtml += `</ul></div>`;
         }
 
-        // Standard Corporate Signature Format
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
         pdfHtml += `</div></div>`;
