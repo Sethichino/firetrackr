@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
         :root { --primary: #d32f2f; --bg: #f5f5f5; --text: #333; }
@@ -130,7 +131,7 @@
             <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
             
             <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Master CSV</button>
+                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Master Data</button>
             </div>
             
             <div style="display: flex; gap: 8px;">
@@ -140,8 +141,8 @@
         </div>
 
         <div class="control-group" id="upload-group">
-            <label>Upload Master CSV</label>
-            <input type="file" id="csv-file" accept=".csv">
+            <label>Upload Master List (Excel/CSV)</label>
+            <input type="file" id="csv-file" accept=".csv, .xlsx, .xls">
         </div>
         
         <div class="row">
@@ -153,7 +154,7 @@
         
         <div style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px;">
             <div class="control-group" style="align-items: center;">
-                <label style="margin-bottom: 4px; color: #d32f2f; font-size: 0.8rem; font-weight: bold;">🚒 Alarms (30d)</label>
+                <label style="margin-bottom: 4px; color: #d32f2f; font-size: 0.8rem; font-weight: bold;">🚒 Alarms (45d)</label>
                 <label class="switch">
                   <input type="checkbox" id="alarm-filter-toggle" onchange="filterMap()">
                   <span class="slider"></span>
@@ -417,127 +418,164 @@
         return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
-    // CONSOLIDATED MASTER IMPORTER
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
         
-        Papa.parse(file, {
-            header: true, skipEmptyLines: true,
-            complete: async function(results) {
-                if (results.data.length === 0) return;
+        document.getElementById('loading-overlay').style.display = 'flex';
+        document.getElementById('loading-text').innerText = "Reading file...";
+        
+        let ext = file.name.split('.').pop().toLowerCase();
+        
+        if (ext === 'xlsx' || ext === 'xls') {
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                let data = new Uint8Array(e.target.result);
+                let workbook = XLSX.read(data, {type: 'array', cellDates: true});
+                let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                let jsonData = XLSX.utils.sheet_to_json(firstSheet, {raw: false, dateNF: 'yyyy-mm-dd'});
+                processImportedData(jsonData);
+            };
+            reader.readAsArrayBuffer(file);
+        } else {
+            Papa.parse(file, {
+                header: true, skipEmptyLines: true,
+                complete: function(results) { processImportedData(results.data); }
+            });
+        }
+    });
+
+    async function processImportedData(data) {
+        if (!data || data.length === 0) {
+            document.getElementById('loading-overlay').style.display = 'none';
+            return;
+        }
+        
+        let headers = Object.keys(data[0]);
+        let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
+        
+        let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
+        let addressField = validHeaders.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || validHeaders.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
+        
+        if (!addressField) {
+            alert("Missing Address Data: We could not find a Street Address column.");
+            document.getElementById('upload-group').style.display = 'flex';
+            document.getElementById('loading-overlay').style.display = 'none';
+            document.getElementById('csv-file').value = ''; 
+            return;
+        }
+        
+        let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
+        let stateField = validHeaders.find(h => /state|province/i.test(h));
+        let zipField = validHeaders.find(h => /zip|postal/i.test(h));
+        let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
+        let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name/i.test(h));
+        let lastField = validHeaders.find(h => /last name/i.test(h));
+        let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
+        let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
+        let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
+        
+        let alarmFields = validHeaders.filter(h => /fire alarm \d+/i.test(h));
+        let newOrUpdatedAccounts = [];
+
+        data.forEach(row => {
+            let bizName = extractTextData(row[nameField]);
+            if (!bizName && row['Topic']) bizName = extractTextData(row['Topic']);
+            
+            let fullAddress = extractTextData(row[addressField]);
+            if (!fullAddress) return;
+            
+            let street = fullAddress.split('\n')[0].trim();
+            
+            if (bizName && street) {
+                let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
+                let existingIndex = allAccounts.findIndex(acc => acc.id === key);
                 
-                let headers = results.meta.fields;
-                let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
-                
-                let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
-                let addressField = validHeaders.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || validHeaders.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
-                
-                if (!addressField) {
-                    for (let h of validHeaders) {
-                        let sample = String(results.data[0][h] || '').trim();
-                        if (/^\d+\s+[a-zA-Z]/.test(sample) && !/^\d{5}/.test(sample)) { addressField = h; break; }
-                    }
+                let extractedCityStateZip = '';
+                if (fullAddress.includes('\n')) {
+                    extractedCityStateZip = fullAddress.split('\n')[1].trim();
+                } else if (cityField && stateField && zipField) {
+                    extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])} ${extractTextData(row[zipField])}`;
+                } else if (cityField && stateField) {
+                    extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])}`;
                 }
                 
-                if (!addressField) {
-                    alert("Missing Address Data: We could not find a Street Address column.");
-                    document.getElementById('upload-group').style.display = 'flex';
-                    e.target.value = ''; return;
+                extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
+                
+                let contactName = extractTextData(row[contactField]);
+                if (lastField && row[lastField] && !contactName.includes(row[lastField])) {
+                    contactName += " " + extractTextData(row[lastField]);
                 }
                 
-                let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
-                let stateField = validHeaders.find(h => /state|province/i.test(h));
-                let zipField = validHeaders.find(h => /zip|postal/i.test(h));
-                let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
-                let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name|last name/i.test(h));
-                let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
-                let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
-                let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
-                
-                // Read the Alarm fields added by the Merger Tool
-                let alarmDateField = validHeaders.find(h => /alarm date/i.test(h));
-                let alarmNotesField = validHeaders.find(h => /alarm note/i.test(h));
-
-                let newOrUpdatedAccounts = [];
-
-                results.data.forEach(row => {
-                    let bizName = extractTextData(row[nameField]); 
-                    let street = extractTextData(row[addressField]);
-                    
-                    if (bizName && street) {
-                        let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
-                        let existingIndex = allAccounts.findIndex(acc => acc.id === key);
-                        
-                        let extractedCityStateZip = '';
-                        if (cityField && stateField && zipField) {
-                            extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])} ${extractTextData(row[zipField])}`;
-                        } else if (cityField && stateField) {
-                            extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])}`;
-                        } else if (combinedCityStateField) {
-                            extractedCityStateZip = extractTextData(row[combinedCityStateField]);
-                        } else if (cityField) {
-                            extractedCityStateZip = extractTextData(row[cityField]);
-                        }
-                        
-                        extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
-                        
-                        let extractedAlarmDate = alarmDateField ? extractTextData(row[alarmDateField]) : '';
-                        let extractedAlarmNotes = alarmNotesField ? extractTextData(row[alarmNotesField]) : '';
-                        
-                        if (existingIndex >= 0) {
-                            if (contactField) allAccounts[existingIndex].Contact_Name = extractTextData(row[contactField]) || allAccounts[existingIndex].Contact_Name;
-                            if (titleField) allAccounts[existingIndex].Job_Title = extractTextData(row[titleField]) || allAccounts[existingIndex].Job_Title;
-                            if (phoneField) allAccounts[existingIndex].Phone = extractTextData(row[phoneField]) || allAccounts[existingIndex].Phone;
-                            if (dateField) allAccounts[existingIndex].Inspection_Date = extractTextData(row[dateField]) || allAccounts[existingIndex].Inspection_Date;
-                            allAccounts[existingIndex]['City, State, Zip'] = extractedCityStateZip || allAccounts[existingIndex]['City, State, Zip'];
-                            
-                            if (extractedAlarmDate) {
-                                let isActive = parseActiveDate(extractedAlarmDate, 30);
-                                let isDuplicate = allAccounts[existingIndex].alarms.some(a => a.date === extractedAlarmDate && a.notes === extractedAlarmNotes);
-                                if (!isDuplicate) {
-                                    allAccounts[existingIndex].alarms.push({ date: extractedAlarmDate, notes: extractedAlarmNotes, active: isActive });
-                                    if (isActive) allAccounts[existingIndex].hasActiveAlarm = true;
-                                }
-                            }
-                        } else {
-                            let newAcc = {
-                                id: key, Business_Name: bizName, Street_Address: street,
-                                'City, State, Zip': extractedCityStateZip, 
-                                Contact_Name: contactField ? extractTextData(row[contactField]) : '',
-                                Job_Title: titleField ? extractTextData(row[titleField]) : '',
-                                Phone: phoneField ? extractTextData(row[phoneField]) : '', 
-                                Inspection_Date: dateField ? extractTextData(row[dateField]) : '',
-                                visited: false, surveys: [], alarms: [], hasActiveAlarm: false
-                            };
-                            
-                            if (extractedAlarmDate) {
-                                let isActive = parseActiveDate(extractedAlarmDate, 30);
-                                newAcc.alarms.push({ date: extractedAlarmDate, notes: extractedAlarmNotes, active: isActive });
-                                if (isActive) newAcc.hasActiveAlarm = true;
-                            }
-                            
-                            newOrUpdatedAccounts.push(newAcc);
-                        }
+                let rowAlarms = [];
+                alarmFields.forEach(af => {
+                    let d = extractTextData(row[af]);
+                    if (d && d.toLowerCase() !== 'nat') {
+                        rowAlarms.push(d);
                     }
                 });
                 
-                if (newOrUpdatedAccounts.length > 0) {
-                    let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
-                    allAccounts = allAccounts.concat(geocodedNew);
+                rowAlarms.sort((a,b) => new Date(b) - new Date(a));
+                let mostRecentAlarm = rowAlarms.length > 0 ? rowAlarms[0] : '';
+                
+                let isActive = false;
+                if (mostRecentAlarm) {
+                    isActive = parseActiveDate(mostRecentAlarm, 45);
                 }
-                
-                localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-                
-                document.getElementById('upload-group').style.display = 'none';
-                document.getElementById('data-status-container').style.display = 'block';
-                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
-                
-                filterMap();
-                e.target.value = '';
+
+                if (existingIndex >= 0) {
+                    let acc = allAccounts[existingIndex];
+                    if (contactField) acc.Contact_Name = contactName || acc.Contact_Name;
+                    if (titleField) acc.Job_Title = extractTextData(row[titleField]) || acc.Job_Title;
+                    if (phoneField) acc.Phone = extractTextData(row[phoneField]) || acc.Phone;
+                    if (dateField) acc.Inspection_Date = extractTextData(row[dateField]) || acc.Inspection_Date;
+                    acc['City, State, Zip'] = extractedCityStateZip || acc['City, State, Zip'];
+                    
+                    rowAlarms.forEach(alarmDate => {
+                        let isDuplicate = acc.alarms.some(a => a.date === alarmDate);
+                        if (!isDuplicate) {
+                            let act = parseActiveDate(alarmDate, 45);
+                            acc.alarms.push({ date: alarmDate, notes: 'Imported from CRM list', active: act });
+                            if (act) acc.hasActiveAlarm = true;
+                        }
+                    });
+                } else {
+                    let newAcc = {
+                        id: key, Business_Name: bizName, Street_Address: street,
+                        'City, State, Zip': extractedCityStateZip, 
+                        Contact_Name: contactName,
+                        Job_Title: titleField ? extractTextData(row[titleField]) : '',
+                        Phone: phoneField ? extractTextData(row[phoneField]) : '', 
+                        Inspection_Date: dateField ? extractTextData(row[dateField]) : '',
+                        visited: false, surveys: [], alarms: [], hasActiveAlarm: isActive
+                    };
+                    
+                    rowAlarms.forEach(alarmDate => {
+                        let act = parseActiveDate(alarmDate, 45);
+                        newAcc.alarms.push({ date: alarmDate, notes: 'Imported from CRM list', active: act });
+                    });
+                    
+                    newOrUpdatedAccounts.push(newAcc);
+                }
             }
         });
-    });
+        
+        if (newOrUpdatedAccounts.length > 0) {
+            let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
+            allAccounts = allAccounts.concat(geocodedNew);
+        }
+        
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+        
+        document.getElementById('upload-group').style.display = 'none';
+        document.getElementById('data-status-container').style.display = 'block';
+        document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
+        
+        document.getElementById('loading-overlay').style.display = 'none';
+        
+        filterMap();
+        document.getElementById('csv-file').value = '';
+    }
 
     async function runRealGeocoder(accounts) {
         document.getElementById('loading-overlay').style.display = 'flex';
@@ -547,7 +585,8 @@
                 document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Satellite limit: 1 address per sec.\nPlease keep screen active.)`;
                 try {
                     let queryStreet = String(acc.Street_Address).replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
-                    let query = `${queryStreet}, ${acc['City, State, Zip']}`.replace(/^[,\s]+|[,\s]+$/g, '').trim();
+                    let queryCity = String(acc['City, State, Zip']).replace(/^[,\s]+|[,\s]+$/g, '').trim();
+                    let query = `${queryStreet}, ${queryCity}`.replace(/^[,\s]+|[,\s]+$/g, '').trim();
                     let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
                     let data = await response.json();
                     
@@ -555,7 +594,7 @@
                         acc.lat = parseFloat(data[0].lat);
                         acc.lon = parseFloat(data[0].lon);
                     } else {
-                        let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(acc['City, State, Zip'])}`);
+                        let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(queryCity)}`);
                         let cityData = await cityResponse.json();
                         if (cityData && cityData.length > 0) {
                             acc.lat = parseFloat(cityData[0].lat);
@@ -708,7 +747,7 @@
             let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
             
             sortedAlarms.forEach(al => {
-                let badge = al.active ? `<span style="color:#d32f2f; font-weight:bold; font-size:0.75rem; margin-left:8px;">(Last 30 Days)</span>` : '';
+                let badge = al.active ? `<span style="color:#d32f2f; font-weight:bold; font-size:0.75rem; margin-left:8px;">(Last 45 Days)</span>` : '';
                 listHtml += `
                     <div class="alarm-item">
                         <strong>${al.date || 'Unknown Date'}</strong> ${badge}
@@ -749,10 +788,6 @@
     }
 
     function closeSheet() { document.getElementById('bottom-sheet').classList.remove('active'); currentSelectedAccount = null; }
-
-    /* =========================================
-       SURVEY BUILDER & REPORT LOGIC
-       ========================================= */
 
     function openSurvey() {
         if(!currentSelectedAccount) return;
