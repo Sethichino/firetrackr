@@ -14,7 +14,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
         :root { --primary: #d32f2f; --bg: #f5f5f5; --text: #333; }
@@ -22,56 +21,82 @@
         
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         
-        #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; text-align: center; font-weight: bold; font-size: 1.2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
-        #fullscreen-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.9rem; cursor: pointer; }
+        #header { background: var(--primary); color: white; padding: env(safe-area-inset-top, 12px) 15px 12px; font-weight: bold; font-size: 1.15rem; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; display: flex; justify-content: space-between; align-items: center; }
+        #fullscreen-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 5px 10px; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
         
-        #controls { padding: 10px; background: white; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 12px; }
-        .control-group { display: flex; flex-direction: column; gap: 4px; }
-        .row { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-        label { font-size: 0.85rem; font-weight: bold; color: #555; }
+        #controls { padding: 8px 10px; background: white; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 8px; }
+        .control-group { display: flex; flex-direction: column; gap: 3px; }
+        .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+        label { font-size: 0.8rem; font-weight: bold; color: #555; }
         
-        input[type="file"], input[type="date"], input[type="text"], select, textarea { padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        input[type="file"], input[type="date"], input[type="text"], select, textarea { padding: 7px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 100%; box-sizing: border-box; }
         textarea { resize: vertical; min-height: 80px; }
-        input[type="range"] { width: 100%; }
+        input[type="range"] { width: 100%; margin: 2px 0; }
         
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: #d32f2f; }
-        input:checked + .slider:before { transform: translateX(20px); }
-        .slider.orange-switch { background-color: #ccc; }
-        input:checked + .slider.orange-switch { background-color: #f57c00; }
-        
-        #map { flex-grow: 1; width: 100%; z-index: 1; }
-        
-        .custom-div-icon { background: transparent; border: none; }
-        
-        #bottom-sheet { position: absolute; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 20px; border-top-right-radius: 20px; padding: 20px; padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 15px rgba(0,0,0,0.15); transform: translateY(110%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1001; max-height: 85vh; overflow-y: auto;}
+        /* Filter Toggle Pills */
+        .toggle-bar { display: flex; gap: 6px; justify-content: space-between; }
+        .filter-pill { flex: 1; padding: 7px 4px; border-radius: 6px; border: 1px solid #ccc; background: #f9f9f9; font-size: 0.78rem; font-weight: bold; color: #444; text-align: center; cursor: pointer; user-select: none; transition: all 0.15s ease; }
+        .filter-pill.active-alarm { background: #ffebee; border-color: #d32f2f; color: #b71c1c; }
+        .filter-pill.active-insp { background: #fff3e0; border-color: #f57c00; color: #e65100; }
+        .filter-pill.active-defic { background: #e3f2fd; border-color: #1976d2; color: #0d47a1; }
+
+        /* Map & Floating GPS Button */
+        #map-wrapper { position: relative; flex: 1.15; width: 100%; min-height: 200px; }
+        #map { width: 100%; height: 100%; z-index: 1; }
+        #gps-center-btn { position: absolute; top: 10px; right: 10px; z-index: 999; background: white; border: 2px solid rgba(0,0,0,0.2); border-radius: 8px; width: 40px; height: 40px; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; box-shadow: 0 2px 6px rgba(0,0,0,0.25); cursor: pointer; }
+        #gps-center-btn:active { background: #eee; }
+
+        /* Custom Emoji Map Markers */
+        .emoji-pin { display: flex; justify-content: center; align-items: center; width: 30px; height: 30px; border-radius: 50%; background: white; border: 2px solid #333; font-size: 16px; box-shadow: 0 2px 5px rgba(0,0,0,0.35); }
+        .pin-alarm { border-color: #d32f2f; background: #ffebee; }
+        .pin-defic { border-color: #1976d2; background: #e3f2fd; }
+        .pin-insp { border-color: #f57c00; background: #fff3e0; }
+        .pin-visited { border-color: #757575; background: #eeeeee; opacity: 0.8; }
+        .pin-default { border-color: #2e7d32; background: #e8f5e9; }
+
+        /* Closest Leads List View Underneath Map */
+        #list-panel { flex: 0.85; background: white; border-top: 2px solid #ddd; display: flex; flex-direction: column; overflow: hidden; z-index: 500; }
+        #list-header { padding: 7px 12px; background: #eee; font-size: 0.8rem; font-weight: bold; color: #333; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        #lead-list { flex: 1; overflow-y: auto; divide-y: 1px solid #f0f0f0; }
+        .lead-row { padding: 10px 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .lead-row:active { background: #f5f5f5; }
+        .lead-row-main { display: flex; align-items: center; gap: 10px; overflow: hidden; }
+        .lead-badge { font-size: 1.2rem; flex-shrink: 0; }
+        .lead-text { overflow: hidden; }
+        .lead-name { font-weight: bold; font-size: 0.9rem; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lead-sub { font-size: 0.78rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lead-dist { font-weight: bold; font-size: 0.82rem; color: var(--primary); flex-shrink: 0; margin-left: 8px; }
+
+        /* Bottom Sheet (Record Page) */
+        #bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 18px; border-top-right-radius: 18px; padding: 14px 18px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 18px rgba(0,0,0,0.25); transform: translateY(115%); transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2000; max-height: 85vh; overflow-y: auto; }
         #bottom-sheet.active { transform: translateY(0); }
+
+        /* Directional Navigation Bar at Top of Record Page */
+        .dir-nav-bar { display: flex; align-items: center; justify-content: space-between; background: #f0f2f5; padding: 6px 8px; border-radius: 10px; margin-bottom: 12px; gap: 6px; }
+        .dir-label { font-size: 0.75rem; font-weight: bold; color: #555; text-transform: uppercase; letter-spacing: 0.5px; padding-left: 4px; }
+        .dir-btns { display: flex; gap: 6px; flex: 1; justify-content: flex-end; }
+        .dir-btn { flex: 1; max-width: 68px; padding: 7px 0; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; font-size: 0.82rem; color: #333; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+        .dir-btn:active { background: #e0e0e0; }
         
-        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; }
-        .sheet-title { font-size: 1.3rem; font-weight: bold; color: var(--text); margin: 0; }
-        .sheet-subtitle { font-size: 0.9rem; color: #666; margin: 4px 0 0 0; }
-        .close-btn { background: none; color: #999; font-size: 1.8rem; border: none; padding: 0; line-height: 1; margin-top: -5px; cursor: pointer; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .sheet-title { font-size: 1.2rem; font-weight: bold; color: var(--text); margin: 0; }
+        .sheet-subtitle { font-size: 0.85rem; color: #666; margin: 3px 0 0 0; }
+        .close-btn { background: none; color: #999; font-size: 1.8rem; border: none; padding: 0 4px; line-height: 1; margin-top: -4px; cursor: pointer; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        .info-item { font-size: 0.85rem; color: #555; }
-        .info-item strong { display: block; color: var(--text); font-size: 0.95rem; margin-bottom: 2px; }
+        .status-banner { padding: 8px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: bold; margin-bottom: 12px; display: none; }
         
-        #alarm-history-container { margin-bottom: 20px; border: 1px solid #ffcdd2; border-radius: 8px; overflow: hidden; display: none; }
-        .alarm-header { background: #d32f2f; color: white; padding: 8px 12px; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;}
-        .alarm-list { background: #ffebee; padding: 10px; max-height: 150px; overflow-y: auto; }
-        .alarm-item { font-size: 0.85rem; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #ffcdd2; }
-        .alarm-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .info-item { font-size: 0.82rem; color: #555; }
+        .info-item strong { display: block; color: var(--text); font-size: 0.88rem; margin-bottom: 2px; }
         
-        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .action-btn { padding: 12px; text-align: center; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 0.95rem; color: white; display: flex; justify-content: center; align-items: center; gap: 8px; cursor: pointer; border: none; }
+        .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .action-btn { padding: 11px; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 0.9rem; color: white; display: flex; justify-content: center; align-items: center; gap: 6px; cursor: pointer; border: none; }
         .nav-btn { background: #f57c00; }
         .call-btn { background: #2e7d32; }
-        .survey-btn { background: #673ab7; grid-column: span 2; padding: 16px; font-size: 1.1rem; }
+        .survey-btn { background: #673ab7; grid-column: span 2; padding: 14px; font-size: 1rem; }
         .visit-btn { background: #757575; grid-column: span 2; }
         
+        /* Survey Modal & Manual Lead Modal */
         #survey-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: #f9f9f9; z-index: 3000; display: none; flex-direction: column; }
         #survey-modal.active { display: flex; }
         .survey-header { background: #673ab7; color: white; padding: env(safe-area-inset-top, 15px) 15px 15px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
@@ -80,32 +105,31 @@
         
         #manual-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 4000; display: none; justify-content: center; align-items: center; padding: 20px; }
         #manual-modal.active { display: flex; }
-        .manual-card { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .manual-card h3 { margin-top: 0; color: var(--primary); margin-bottom: 15px; border-bottom: 2px solid var(--primary); padding-bottom: 8px;}
+        .manual-card { background: white; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; }
+        .manual-card h3 { margin-top: 0; color: var(--primary); margin-bottom: 12px; border-bottom: 2px solid var(--primary); padding-bottom: 6px; }
         
         .building-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-bottom: 20px; border: 1px solid #eee; }
         .bldg-header { font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #673ab7; }
         
-        .counter-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f0f0f0; }
-        .counter-label { font-weight: 500; font-size: 0.95rem; color: #444; }
+        .counter-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
+        .counter-label { font-weight: 500; font-size: 0.92rem; color: #444; }
         .counter-controls { display: flex; align-items: center; gap: 8px; }
-        .c-btn { width: 36px; height: 36px; border-radius: 50%; border: none; background: #e0e0e0; font-size: 1.2rem; font-weight: bold; color: #333; cursor: pointer; display: flex; justify-content: center; align-items: center; }
-        .c-btn:active { background: #bdbdbd; }
-        .c-input { width: 50px; text-align: center; font-size: 1rem; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; padding: 8px 4px; }
+        .c-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: #e0e0e0; font-size: 1.1rem; font-weight: bold; color: #333; cursor: pointer; display: flex; justify-content: center; align-items: center; }
+        .c-input { width: 48px; text-align: center; font-size: 0.95rem; font-weight: bold; border: 1px solid #ccc; border-radius: 6px; padding: 6px 4px; }
         
-        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; margin-top: 10px; }
-        .photo-thumb { width: 100%; height: 80px; object-fit: cover; border-radius: 6px; border: 1px solid #ccc; }
+        .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); gap: 8px; margin-top: 10px; }
+        .photo-thumb { width: 100%; height: 75px; object-fit: cover; border-radius: 6px; border: 1px solid #ccc; }
         
-        .notes-section { background: #fff3e0; padding: 12px; border-radius: 6px; margin-top: 20px; border: 1px solid #ffe0b2; }
-        .notes-section label { display: block; margin-bottom: 8px; color: #e65100; font-size: 0.9rem; }
+        .notes-section { background: #fff3e0; padding: 12px; border-radius: 6px; margin-top: 16px; border: 1px solid #ffe0b2; }
+        .notes-section label { display: block; margin-bottom: 6px; color: #e65100; font-size: 0.85rem; }
         
-        .survey-actions { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 15px; padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .btn-add { background: #0288d1; grid-column: span 2;}
+        .survey-actions { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 12px 15px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -2px 10px rgba(0,0,0,0.1); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .btn-add { background: #0288d1; grid-column: span 2; }
         .btn-pdf { background: #d32f2f; }
         .btn-email { background: #2e7d32; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.95); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; text-align: center; padding: 20px;}
-        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); color: white; display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 5000; text-align: center; padding: 20px; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid var(--primary); border-radius: 50%; width: 48px; height: 48px; animation: spin 1s linear infinite; margin-bottom: 15px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         #print-container { display: none; }
@@ -122,79 +146,95 @@
 
 <div id="app-container">
     <div id="header">
-        <span>Firetrackr</span>
+        <span>🔥 Firetrackr</span>
         <button id="fullscreen-btn" onclick="toggleFullscreen()">⛶ Fullscreen</button>
     </div>
     
     <div id="controls">
-        <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 12px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9; margin-bottom: 5px;">
-            <div id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 1rem; margin-bottom: 10px;">✅ Accounts Loaded</div>
-            
-            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 12px; background: #1976d2; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">📂 Import Master Data</button>
+        <div id="data-status-container" style="display: none; background: #e8f5e9; padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #c8e6c9;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span id="data-status-text" style="color: #2e7d32; font-weight: bold; font-size: 0.85rem;">✅ Accounts Loaded</span>
+                <button onclick="clearData()" style="padding: 4px 8px; background: none; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 4px; font-weight: bold; font-size: 0.75rem; cursor: pointer;">🗑️ Reset</button>
             </div>
-            
-            <div style="display: flex; gap: 8px;">
-                <button onclick="openManualModal()" style="flex: 1; padding: 12px; background: #f57c00; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 0.9rem; cursor: pointer;">➕ Add Manual Lead</button>
-                <button onclick="clearData()" style="flex: 1; padding: 12px; background: none; color: #d32f2f; border: 1px solid #d32f2f; border-radius: 6px; font-weight: bold; font-size: 0.85rem; cursor: pointer;">🗑️ Delete All</button>
+            <div style="display: flex; gap: 6px;">
+                <button onclick="document.getElementById('csv-file').click()" style="flex: 1; padding: 7px; background: #1976d2; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 0.8rem; cursor: pointer;">📂 Add/Update CSV</button>
+                <button onclick="openManualModal()" style="flex: 1; padding: 7px; background: #f57c00; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 0.8rem; cursor: pointer;">➕ Manual Lead</button>
             </div>
         </div>
 
         <div class="control-group" id="upload-group">
-            <label>Upload Master List (Excel/CSV)</label>
-            <input type="file" id="csv-file" accept=".csv, .xlsx, .xls">
+            <label>Upload Master CRM Export (CSV)</label>
+            <input type="file" id="csv-file" accept=".csv">
+        </div>
+
+        <!-- Search Bar -->
+        <div class="row">
+            <input type="text" id="search-input" placeholder="🔍 Search property, contact name, or address..." oninput="filterMap()">
         </div>
         
+        <!-- Radius Slider -->
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <label>Radius: <span id="radius-val">2</span> miles</label>
-                <input type="range" id="radius-slider" min="1" max="100" value="2" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+                <label>Radius: <span id="radius-val">10</span> miles</label>
+                <input type="range" id="radius-slider" min="1" max="100" value="10" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
         </div>
-        
-        <div style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-top: 10px;">
-            <div class="control-group" style="align-items: center;">
-                <label style="margin-bottom: 4px; color: #d32f2f; font-size: 0.8rem; font-weight: bold;">🚒 Alarms (45d)</label>
-                <label class="switch">
-                  <input type="checkbox" id="alarm-filter-toggle" onchange="filterMap()">
-                  <span class="slider"></span>
-                </label>
-            </div>
-            <div class="control-group" style="align-items: center;">
-                <label style="margin-bottom: 4px; color: #f57c00; font-size: 0.8rem; font-weight: bold;">🔥 Insp Due (90d)</label>
-                <label class="switch">
-                  <input type="checkbox" id="inspection-filter-toggle" onchange="filterMap()">
-                  <span class="slider orange-switch"></span>
-                </label>
-            </div>
+
+        <!-- Priority Status Filter Toggles -->
+        <div class="toggle-bar">
+            <div id="toggle-alarm" class="filter-pill" onclick="toggleFilter('alarm')">🚒 Alarms (30d)</div>
+            <div id="toggle-insp" class="filter-pill" onclick="toggleFilter('insp')">🔥 Insp Due (60d)</div>
+            <div id="toggle-defic" class="filter-pill" onclick="toggleFilter('defic')">🔧 Defic (45d)</div>
         </div>
     </div>
     
-    <div id="map"></div>
+    <!-- Map Area with Floating Re-Center Button -->
+    <div id="map-wrapper">
+        <div id="map"></div>
+        <button id="gps-center-btn" title="Center on my location" onclick="centerOnUserGPS()">🎯</button>
+    </div>
+
+    <!-- Closest Leads List View Underneath Map -->
+    <div id="list-panel">
+        <div id="list-header">
+            <span>📍 Closest Leads to You</span>
+            <span id="list-count">0 matches</span>
+        </div>
+        <div id="lead-list"></div>
+    </div>
 </div>
 
+<!-- Manual Lead Modal -->
 <div id="manual-modal">
     <div class="manual-card">
         <h3>Add Manual Lead</h3>
-        <div class="control-group" style="margin-bottom: 10px;">
-            <label>Business Name (Required)</label>
+        <div class="control-group" style="margin-bottom: 8px;">
+            <label>Property / Business Name *</label>
             <input type="text" id="manual-name" placeholder="e.g. Cedar Park Plaza">
         </div>
-        <div class="control-group" style="margin-bottom: 10px;">
-            <label>Street Address (Required)</label>
+        <div class="control-group" style="margin-bottom: 8px;">
+            <label>Street Address *</label>
             <input type="text" id="manual-street" placeholder="e.g. 123 Main St">
         </div>
-        <div class="control-group" style="margin-bottom: 10px;">
+        <div class="control-group" style="margin-bottom: 8px;">
             <label>City, State, Zip</label>
             <input type="text" id="manual-city" placeholder="e.g. Cedar Park, TX 78613">
         </div>
-        <div class="control-group" style="margin-bottom: 10px;">
+        <div class="control-group" style="margin-bottom: 8px;">
             <label>Contact Name</label>
             <input type="text" id="manual-contact">
         </div>
-        <div class="control-group" style="margin-bottom: 20px;">
+        <div class="control-group" style="margin-bottom: 8px;">
+            <label>Job Title</label>
+            <input type="text" id="manual-title" placeholder="e.g. Property Manager">
+        </div>
+        <div class="control-group" style="margin-bottom: 8px;">
             <label>Phone</label>
             <input type="text" id="manual-phone">
+        </div>
+        <div class="control-group" style="margin-bottom: 14px;">
+            <label>Inspection Due Date</label>
+            <input type="date" id="manual-insp">
         </div>
         <div style="display: flex; gap: 10px;">
             <button onclick="closeManualModal()" style="flex: 1; padding: 10px; background: #9e9e9e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancel</button>
@@ -203,7 +243,19 @@
     </div>
 </div>
 
+<!-- Record Detail Sheet -->
 <div id="bottom-sheet">
+    <!-- Directional Compass Navigation Bar -->
+    <div class="dir-nav-bar">
+        <span class="dir-label">Next Nearest:</span>
+        <div class="dir-btns">
+            <button class="dir-btn" onclick="navigateDirection('N')" title="Nearest North">⬆️ N</button>
+            <button class="dir-btn" onclick="navigateDirection('S')" title="Nearest South">⬇️ S</button>
+            <button class="dir-btn" onclick="navigateDirection('W')" title="Nearest West">⬅️ W</button>
+            <button class="dir-btn" onclick="navigateDirection('E')" title="Nearest East">➡️ E</button>
+        </div>
+    </div>
+
     <div class="sheet-header">
         <div>
             <h2 class="sheet-title" id="sheet-title">Business Name</h2>
@@ -211,32 +263,27 @@
         </div>
         <button class="close-btn" onclick="closeSheet()">×</button>
     </div>
+
+    <div id="sheet-status-banner" class="status-banner"></div>
     
-    <div id="alarm-history-container">
-        <div class="alarm-header">
-            <span>🚨 Recent Alarm Activity</span>
-            <span id="alarm-count-badge" style="background: white; color: #d32f2f; padding: 2px 6px; border-radius: 10px; font-size: 0.8rem;">0</span>
-        </div>
-        <div class="alarm-list" id="alarm-list-content">
-            <!-- Injected Alarm Data -->
-        </div>
-    </div>
-    
-    <div class="info-grid" style="margin-bottom: 10px;">
+    <div class="info-grid">
         <div class="info-item">
-            <strong>Contact</strong>
-            <span id="sheet-contact">John Doe</span>
-            <div id="sheet-job-title" style="font-size: 0.75rem; color: #777; margin-top: 2px;">Manager</div>
+            <strong>Contact & Title</strong>
+            <span id="sheet-contact">N/A</span>
+            <div id="sheet-jobtitle" style="font-size: 0.78rem; color: #777; margin-top: 2px;"></div>
         </div>
         <div class="info-item">
             <strong>Phone</strong>
             <span id="sheet-phone">N/A</span>
         </div>
-    </div>
-    
-    <div class="info-item" id="sheet-insp-container" style="margin-bottom: 15px; display: none; background: #fff3e0; padding: 8px; border-radius: 6px; border: 1px solid #ffe0b2;">
-        <strong style="color: #f57c00;">Upcoming Inspection Date (CRM)</strong>
-        <span id="sheet-insp-date">N/A</span>
+        <div class="info-item">
+            <strong>Inspection Cycle (1st)</strong>
+            <span id="sheet-insp">N/A</span>
+        </div>
+        <div class="info-item">
+            <strong>Last Alarm</strong>
+            <span id="sheet-alarm">None Recorded</span>
+        </div>
     </div>
     
     <div class="actions">
@@ -247,14 +294,13 @@
     </div>
 </div>
 
+<!-- Survey Modal -->
 <div id="survey-modal">
     <div class="survey-header">
         <h3 id="survey-modal-title">Site Survey</h3>
         <button style="background:none; border:none; color:white; font-size:1.5rem; cursor:pointer;" onclick="closeSurvey()">×</button>
     </div>
-    <div class="survey-content" id="survey-content">
-        <!-- Buildings injected here -->
-    </div>
+    <div class="survey-content" id="survey-content"></div>
     <div class="survey-actions">
         <button class="action-btn btn-add" onclick="addBuilding()">➕ Add Building</button>
         <button class="action-btn btn-pdf" onclick="generatePDF()">📄 Save as PDF</button>
@@ -264,7 +310,7 @@
 
 <div id="loading-overlay">
     <div class="spinner"></div>
-    <div id="loading-text" style="font-weight: bold; font-size: 1.1rem; line-height: 1.4;">Processing...</div>
+    <div id="loading-text" style="font-weight: bold; font-size: 1.05rem; line-height: 1.4;">Processing...</div>
 </div>
 
 <div id="print-container"></div>
@@ -286,12 +332,28 @@
         { id: 'drySprinklers', label: 'Dry Sprinklers' }
     ];
 
+    let map;
+    let markersLayer = L.layerGroup();
+    let userLocationMarker = null;
+    let allAccounts = [];
+    let currentFilteredAccounts = [];
+    let userLat = 30.2672; 
+    let userLon = -97.7431;
+    let currentSelectedAccount = null;
+
+    // Toggle States
+    let activeFilters = {
+        alarm: false,
+        insp: false,
+        defic: false
+    };
+
     function toggleFullscreen() {
         let elem = document.documentElement;
         if (!document.fullscreenElement) {
             if (elem.requestFullscreen) elem.requestFullscreen();
             else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-            document.getElementById('fullscreen-btn').innerText = '✖ Exit Fullscreen';
+            document.getElementById('fullscreen-btn').innerText = '✖ Exit';
         } else {
             if (document.exitFullscreen) document.exitFullscreen();
             else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
@@ -299,44 +361,180 @@
         }
     }
 
-    let map;
-    let markersLayer = L.layerGroup();
-    let allAccounts = [];
-    let userLat = 30.2672; 
-    let userLon = -97.7431;
-    let currentSelectedAccount = null;
-
-    const defaultIcon = new L.Icon.Default();
-    const visitedIcon = new L.Icon({
-        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-        iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
-    });
-    
-    const fireTruckIcon = L.divIcon({
-        html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🚒</div>',
-        className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
-    });
-    
-    const fireIcon = L.divIcon({
-        html: '<div style="font-size: 24px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">🔥</div>',
-        className: 'custom-div-icon', iconSize: [30, 30], iconAnchor: [15, 15]
-    });
-
     function initMap() {
-        map = L.map('map').setView([userLat, userLon], 10);
+        map = L.map('map').setView([userLat, userLon], 11);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
         markersLayer.addTo(map);
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
-                userLat = pos.coords.latitude; userLon = pos.coords.longitude;
-                map.setView([userLat, userLon], 11);
-                L.circleMarker([userLat, userLon], { radius: 8, fillColor: "#2196F3", color: "#fff", weight: 2, opacity: 1, fillOpacity: 1 }).addTo(map);
+                userLat = pos.coords.latitude;
+                userLon = pos.coords.longitude;
+                updateUserMarker();
+                map.setView([userLat, userLon], 12);
                 loadSavedAccounts();
-            }, err => { loadSavedAccounts(); });
-        } else { loadSavedAccounts(); }
+            }, () => {
+                updateUserMarker();
+                loadSavedAccounts();
+            }, { enableHighAccuracy: true });
+        } else {
+            updateUserMarker();
+            loadSavedAccounts();
+        }
     }
+
+    function updateUserMarker() {
+        if (userLocationMarker) {
+            userLocationMarker.setLatLng([userLat, userLon]);
+        } else {
+            userLocationMarker = L.circleMarker([userLat, userLon], {
+                radius: 9,
+                fillColor: "#2196F3",
+                color: "#ffffff",
+                weight: 3,
+                opacity: 1,
+                fillOpacity: 1
+            }).addTo(map).bindPopup("<b>Your Current Location</b>");
+        }
+    }
+
+    // GPS Re-Center Button Handler
+    function centerOnUserGPS() {
+        if (!navigator.geolocation) {
+            map.setView([userLat, userLon], 14);
+            return;
+        }
+        navigator.geolocation.getCurrentPosition(pos => {
+            userLat = pos.coords.latitude;
+            userLon = pos.coords.longitude;
+            updateUserMarker();
+            map.setView([userLat, userLon], 14);
+            filterMap(false); // Re-sort distances from new GPS position without overriding zoom
+        }, () => {
+            map.setView([userLat, userLon], 14);
+        }, { enableHighAccuracy: true, timeout: 6000 });
+    }
+
+    /* =======================================================
+       DATE & STATUS EVALUATION ENGINE (30d Alarm / 60d Insp / 45d Defic)
+       ======================================================= */
+
+    function parseFlexibleDate(str) {
+        if (!str) return null;
+        let clean = String(str).trim();
+        if (!clean) return null;
+        // Handle Austin Fire Dispatch format e.g. "2026 Apr 11 06:43:38 AM"
+        let parsed = new Date(clean);
+        if (!isNaN(parsed.getTime())) return parsed;
+        let match = clean.match(/(\d{4})\s+([A-Za-z]{3})\s+(\d{1,2})/);
+        if (match) {
+            parsed = new Date(`${match[2]} ${match[3]}, ${match[1]}`);
+            if (!isNaN(parsed.getTime())) return parsed;
+        }
+        return null;
+    }
+
+    function evaluateAccountStatus(acc) {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+        let isAlarm30d = false;
+        let daysSinceAlarm = null;
+        let alarmDateObj = parseFlexibleDate(acc.Alarm_Date);
+        if (alarmDateObj) {
+            let alarmDay = new Date(alarmDateObj.getFullYear(), alarmDateObj.getMonth(), alarmDateObj.getDate());
+            let diffDays = Math.floor((today - alarmDay) / MS_PER_DAY);
+            if (diffDays >= 0 && diffDays <= 30) {
+                isAlarm30d = true;
+                daysSinceAlarm = diffDays;
+            }
+        }
+
+        let isInspDue60d = false;
+        let isDefic45d = false;
+        let daysUntilInsp = null;
+        let daysSinceInsp = null;
+        let inspMonthName = null;
+
+        let inspDateObj = parseFlexibleDate(acc.Inspection_Date);
+        if (inspDateObj) {
+            let inspMonth = inspDateObj.getMonth(); // 0 - 11
+            inspMonthName = inspDateObj.toLocaleString('default', { month: 'short' });
+
+            // Check candidate 1st-of-month dates across previous, current, and next year
+            let candidates = [
+                new Date(today.getFullYear() - 1, inspMonth, 1),
+                new Date(today.getFullYear(), inspMonth, 1),
+                new Date(today.getFullYear() + 1, inspMonth, 1)
+            ];
+
+            candidates.forEach(dueFirst => {
+                let diffFromDue = Math.floor((today - dueFirst) / MS_PER_DAY);
+                // Once property hits due date on the 1st (diffFromDue === 0) until 45 days after: Wrench / Deficiency Window
+                if (diffFromDue >= 0 && diffFromDue <= 45) {
+                    isDefic45d = true;
+                    daysSinceInsp = diffFromDue;
+                }
+                // Within 60 days prior to the 1st of the due month: Inspection Due Window
+                let diffUntilDue = Math.floor((dueFirst - today) / MS_PER_DAY);
+                if (diffUntilDue >= 1 && diffUntilDue <= 60) {
+                    isInspDue60d = true;
+                    daysUntilInsp = diffUntilDue;
+                }
+            });
+        }
+
+        return {
+            isAlarm30d,
+            daysSinceAlarm,
+            isInspDue60d,
+            daysUntilInsp,
+            isDefic45d,
+            daysSinceInsp,
+            inspMonthName
+        };
+    }
+
+    function getAccountBadgeAndIcon(acc, status) {
+        let emoji = '📍';
+        let cssClass = 'pin-default';
+
+        if (status.isAlarm30d) {
+            emoji = '🚒';
+            cssClass = 'pin-alarm';
+        } else if (status.isDefic45d) {
+            emoji = '🔧';
+            cssClass = 'pin-defic';
+        } else if (status.isInspDue60d) {
+            emoji = '🔥';
+            cssClass = 'pin-insp';
+        } else if (acc.visited) {
+            emoji = '✅';
+            cssClass = 'pin-visited';
+        }
+
+        let icon = L.divIcon({
+            className: '',
+            html: `<div class="emoji-pin ${cssClass}">${emoji}</div>`,
+            iconSize: [30, 30],
+            iconAnchor: [15, 15]
+        });
+
+        return { emoji, icon };
+    }
+
+    function toggleFilter(type) {
+        activeFilters[type] = !activeFilters[type];
+        document.getElementById('toggle-alarm').className = 'filter-pill' + (activeFilters.alarm ? ' active-alarm' : '');
+        document.getElementById('toggle-insp').className = 'filter-pill' + (activeFilters.insp ? ' active-insp' : '');
+        document.getElementById('toggle-defic').className = 'filter-pill' + (activeFilters.defic ? ' active-defic' : '');
+        filterMap();
+    }
+
+    /* =======================================================
+       STORAGE & CSV INGESTION
+       ======================================================= */
 
     function loadSavedAccounts() {
         let savedData = localStorage.getItem('firetrackr_accounts');
@@ -353,20 +551,27 @@
     }
 
     function clearData() {
-        if(confirm("Are you sure you want to permanently delete all leads, surveys, alarms, and photos?")) {
+        if (confirm("Are you sure you want to permanently delete all leads, surveys, and photos?")) {
             localStorage.removeItem('firetrackr_accounts');
-            allAccounts = []; markersLayer.clearLayers();
+            allAccounts = [];
+            currentFilteredAccounts = [];
+            markersLayer.clearLayers();
+            document.getElementById('lead-list').innerHTML = '';
+            document.getElementById('list-count').innerText = '0 matches';
             document.getElementById('upload-group').style.display = 'flex';
             document.getElementById('data-status-container').style.display = 'none';
             document.getElementById('csv-file').value = '';
-            map.setView([userLat, userLon], 10);
             closeSheet();
         }
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 3958.8; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        const R = 3958.8;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         return R * c;
     }
@@ -384,259 +589,157 @@
             } catch (e) { return ''; }
         }
         let strVal = String(value).trim();
-        if (strVal.includes('[object')) return '';
-        if (strVal === 'undefined' || strVal === 'null') return '';
+        if (strVal.includes('[object') || strVal === 'undefined' || strVal === 'null') return '';
         return strVal;
-    }
-    
-    function parseActiveDate(dateStr, daysLimit) {
-        if (!dateStr) return false;
-        let d = new Date(dateStr);
-        if (isNaN(d)) {
-            let match = String(dateStr).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-            if (match) {
-                let year = match[3].length === 2 ? "20" + match[3] : match[3];
-                d = new Date(`${year}-${match[1].padStart(2,'0')}-${match[2].padStart(2,'0')}T12:00:00`);
-            }
-        }
-        if (isNaN(d)) return false; 
-        let limitDate = new Date();
-        limitDate.setDate(limitDate.getDate() - daysLimit);
-        return d >= limitDate;
-    }
-
-    function isWithin90DaysAnnual(dateStr) {
-        if (!dateStr) return false;
-        let d = new Date(dateStr);
-        if (isNaN(d)) return false;
-        let today = new Date();
-        today.setHours(0,0,0,0);
-        let thisYearAnniv = new Date(today.getFullYear(), d.getMonth(), d.getDate());
-        let nextYearAnniv = new Date(today.getFullYear() + 1, d.getMonth(), d.getDate());
-        let diffThisYear = (thisYearAnniv - today) / (1000 * 60 * 60 * 24);
-        let diffNextYear = (nextYearAnniv - today) / (1000 * 60 * 60 * 24);
-        return (diffThisYear >= 0 && diffThisYear <= 90) || (diffNextYear >= 0 && diffNextYear <= 90);
     }
 
     document.getElementById('csv-file').addEventListener('change', function(e) {
         let file = e.target.files[0];
         if (!file) return;
         
-        document.getElementById('loading-overlay').style.display = 'flex';
-        document.getElementById('loading-text').innerText = "Reading file...";
-        
-        let ext = file.name.split('.').pop().toLowerCase();
-        
-        if (ext === 'xlsx' || ext === 'xls') {
-            let reader = new FileReader();
-            reader.onload = function(e) {
-                let data = new Uint8Array(e.target.result);
-                let workbook = XLSX.read(data, {type: 'array', cellDates: true});
-                let firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                let jsonData = XLSX.utils.sheet_to_json(firstSheet, {raw: false, dateNF: 'yyyy-mm-dd'});
-                processImportedData(jsonData);
-            };
-            reader.readAsArrayBuffer(file);
-        } else {
-            Papa.parse(file, {
-                header: true, skipEmptyLines: true,
-                complete: function(results) { processImportedData(results.data); }
-            });
-        }
-    });
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async function(results) {
+                let headers = results.meta.fields || [];
+                
+                let nameField = headers.find(h => /topic|business|company|account|property/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/contact|first|last|url|web|email/i.test(h)) || headers[0];
+                let addressField = headers.find(h => /street 1|address 1/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers.find(h => /street|address/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers[1];
+                let cityStateField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h)) || headers.find(h => /zip|postal/i.test(h)) || headers[2];
+                let contactField = headers.find(h => /contact|full name|primary contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
+                let titleField = headers.find(h => /job title|title|role|position/i.test(h));
+                let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
+                let inspField = headers.find(h => /inspection|due date|insp/i.test(h));
+                let alarmDateField = headers.find(h => /alarm date|incident date|dispatch/i.test(h));
+                let alarmNotesField = headers.find(h => /alarm note|incident|problem/i.test(h));
+                let latField = headers.find(h => /^lat|latitude/i.test(h));
+                let lonField = headers.find(h => /^lon|^lng|longitude/i.test(h));
 
-    async function processImportedData(data) {
-        if (!data || data.length === 0) {
-            document.getElementById('loading-overlay').style.display = 'none';
-            return;
-        }
-        
-        let headers = Object.keys(data[0]);
-        let validHeaders = headers.filter(h => !h.includes('(Do Not Modify)'));
-        
-        let nameField = validHeaders.find(h => /topic|business|company|account/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /name/i.test(h) && !/url|web|email|first|last/i.test(h)) || validHeaders[0];
-        let addressField = validHeaders.find(h => /street 1|address 1|line 1/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h)) || validHeaders.find(h => /street|address|location/i.test(h) && !/web|email|mac|ip|url|site|billing/i.test(h));
-        
-        if (!addressField) {
-            alert("Missing Address Data: We could not find a Street Address column.");
-            document.getElementById('upload-group').style.display = 'flex';
-            document.getElementById('loading-overlay').style.display = 'none';
-            document.getElementById('csv-file').value = ''; 
-            return;
-        }
-        
-        let cityField = validHeaders.find(h => /city/i.test(h) && !/capacity/i.test(h));
-        let stateField = validHeaders.find(h => /state|province/i.test(h));
-        let zipField = validHeaders.find(h => /zip|postal/i.test(h));
-        let combinedCityStateField = validHeaders.find(h => /city, state|city state/i.test(h));
-        let contactField = validHeaders.find(h => /contact/i.test(h) && !/url|web|email/i.test(h)) || validHeaders.find(h => /first name/i.test(h));
-        let lastField = validHeaders.find(h => /last name/i.test(h));
-        let phoneField = validHeaders.find(h => /phone|mobile|cell/i.test(h));
-        let titleField = validHeaders.find(h => /job title|title|position|role/i.test(h) && !/account|business|company/i.test(h));
-        let dateField = validHeaders.find(h => /inspection date|due date|next inspection|anniversary/i.test(h) && !/note/i.test(h));
-        
-        let alarmFields = validHeaders.filter(h => /fire alarm \d+/i.test(h));
-        let newOrUpdatedAccounts = [];
+                let newOrUpdatedAccounts = [];
 
-        data.forEach(row => {
-            let bizName = extractTextData(row[nameField]);
-            if (!bizName && row['Topic']) bizName = extractTextData(row['Topic']);
-            
-            let fullAddress = extractTextData(row[addressField]);
-            if (!fullAddress) return;
-            
-            let street = fullAddress.split('\n')[0].trim();
-            
-            if (bizName && street) {
-                let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
-                let existingIndex = allAccounts.findIndex(acc => acc.id === key);
-                
-                let extractedCityStateZip = '';
-                if (fullAddress.includes('\n')) {
-                    extractedCityStateZip = fullAddress.split('\n')[1].trim();
-                } else if (cityField && stateField && zipField) {
-                    extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])} ${extractTextData(row[zipField])}`;
-                } else if (cityField && stateField) {
-                    extractedCityStateZip = `${extractTextData(row[cityField])}, ${extractTextData(row[stateField])}`;
-                }
-                
-                extractedCityStateZip = extractedCityStateZip.replace(/^[,\s]+|[,\s]+$/g, '').replace(/,\s*,/g, ',');
-                
-                let contactName = extractTextData(row[contactField]);
-                if (lastField && row[lastField] && !contactName.includes(row[lastField])) {
-                    contactName += " " + extractTextData(row[lastField]);
-                }
-                
-                let rowAlarms = [];
-                alarmFields.forEach(af => {
-                    let d = extractTextData(row[af]);
-                    if (d && d.toLowerCase() !== 'nat') {
-                        rowAlarms.push(d);
+                results.data.forEach(row => {
+                    let bizName = extractTextData(row[nameField]); 
+                    let street = extractTextData(row[addressField]);
+                    
+                    if (bizName && street) {
+                        let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
+                        let existingIndex = allAccounts.findIndex(acc => acc.id === key);
+                        
+                        let extractedCityStateZip = row[cityStateField] ? extractTextData(row[cityStateField]) : '';
+                        let rowLat = latField && row[latField] ? parseFloat(row[latField]) : null;
+                        let rowLon = lonField && row[lonField] ? parseFloat(row[lonField]) : null;
+
+                        if (existingIndex >= 0) {
+                            let ex = allAccounts[existingIndex];
+                            ex.Contact_Name = extractTextData(row[contactField]) || ex.Contact_Name;
+                            ex.Job_Title = (titleField ? extractTextData(row[titleField]) : '') || ex.Job_Title;
+                            ex.Phone = extractTextData(row[phoneField]) || ex.Phone;
+                            ex['City, State, Zip'] = extractedCityStateZip || ex['City, State, Zip'];
+                            ex.Inspection_Date = (inspField ? extractTextData(row[inspField]) : '') || ex.Inspection_Date;
+                            ex.Alarm_Date = (alarmDateField ? extractTextData(row[alarmDateField]) : '') || ex.Alarm_Date;
+                            ex.Alarm_Notes = (alarmNotesField ? extractTextData(row[alarmNotesField]) : '') || ex.Alarm_Notes;
+                            if (rowLat && rowLon) { ex.lat = rowLat; ex.lon = rowLon; }
+                        } else {
+                            newOrUpdatedAccounts.push({
+                                id: key,
+                                Business_Name: bizName,
+                                Street_Address: street,
+                                'City, State, Zip': extractedCityStateZip,
+                                Contact_Name: extractTextData(row[contactField]),
+                                Job_Title: titleField ? extractTextData(row[titleField]) : '',
+                                Phone: extractTextData(row[phoneField]),
+                                Inspection_Date: inspField ? extractTextData(row[inspField]) : '',
+                                Alarm_Date: alarmDateField ? extractTextData(row[alarmDateField]) : '',
+                                Alarm_Notes: alarmNotesField ? extractTextData(row[alarmNotesField]) : '',
+                                lat: rowLat && !isNaN(rowLat) ? rowLat : null,
+                                lon: rowLon && !isNaN(rowLon) ? rowLon : null,
+                                visited: false,
+                                surveys: [] 
+                            });
+                        }
                     }
                 });
                 
-                rowAlarms.sort((a,b) => new Date(b) - new Date(a));
-                let mostRecentAlarm = rowAlarms.length > 0 ? rowAlarms[0] : '';
+                if (newOrUpdatedAccounts.length > 0) {
+                    let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
+                    allAccounts = allAccounts.concat(geocodedNew);
+                } else if (allAccounts.length === 0) {
+                    alert("Could not detect Business Name and Address columns.");
+                    return;
+                }
                 
-                let isActive = false;
-                if (mostRecentAlarm) {
-                    isActive = parseActiveDate(mostRecentAlarm, 45);
-                }
-
-                if (existingIndex >= 0) {
-                    let acc = allAccounts[existingIndex];
-                    if (contactField) acc.Contact_Name = contactName || acc.Contact_Name;
-                    if (titleField) acc.Job_Title = extractTextData(row[titleField]) || acc.Job_Title;
-                    if (phoneField) acc.Phone = extractTextData(row[phoneField]) || acc.Phone;
-                    if (dateField) acc.Inspection_Date = extractTextData(row[dateField]) || acc.Inspection_Date;
-                    acc['City, State, Zip'] = extractedCityStateZip || acc['City, State, Zip'];
-                    
-                    rowAlarms.forEach(alarmDate => {
-                        let isDuplicate = acc.alarms.some(a => a.date === alarmDate);
-                        if (!isDuplicate) {
-                            let act = parseActiveDate(alarmDate, 45);
-                            acc.alarms.push({ date: alarmDate, notes: 'Imported from CRM list', active: act });
-                            if (act) acc.hasActiveAlarm = true;
-                        }
-                    });
-                } else {
-                    let newAcc = {
-                        id: key, Business_Name: bizName, Street_Address: street,
-                        'City, State, Zip': extractedCityStateZip, 
-                        Contact_Name: contactName,
-                        Job_Title: titleField ? extractTextData(row[titleField]) : '',
-                        Phone: phoneField ? extractTextData(row[phoneField]) : '', 
-                        Inspection_Date: dateField ? extractTextData(row[dateField]) : '',
-                        visited: false, surveys: [], alarms: [], hasActiveAlarm: isActive
-                    };
-                    
-                    rowAlarms.forEach(alarmDate => {
-                        let act = parseActiveDate(alarmDate, 45);
-                        newAcc.alarms.push({ date: alarmDate, notes: 'Imported from CRM list', active: act });
-                    });
-                    
-                    newOrUpdatedAccounts.push(newAcc);
-                }
+                localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+                document.getElementById('upload-group').style.display = 'none';
+                document.getElementById('data-status-container').style.display = 'block';
+                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
+                
+                filterMap();
+                e.target.value = '';
             }
         });
-        
-        if (newOrUpdatedAccounts.length > 0) {
-            let geocodedNew = await runRealGeocoder(newOrUpdatedAccounts);
-            allAccounts = allAccounts.concat(geocodedNew);
-        }
-        
-        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-        
-        document.getElementById('upload-group').style.display = 'none';
-        document.getElementById('data-status-container').style.display = 'block';
-        document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
-        
-        document.getElementById('loading-overlay').style.display = 'none';
-        
-        filterMap();
-        document.getElementById('csv-file').value = '';
-    }
+    });
 
     async function runRealGeocoder(accounts) {
+        let needsGeo = accounts.filter(a => !a.lat || !a.lon);
+        if (needsGeo.length === 0) return accounts;
+
         document.getElementById('loading-overlay').style.display = 'flex';
         let processed = 0;
-        for (let acc of accounts) {
-            if (!acc.lat || !acc.lon) {
-                document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${accounts.length}...\n(Satellite limit: 1 address per sec.\nPlease keep screen active.)`;
-                try {
-                    let queryStreet = String(acc.Street_Address).replace(/(suite|ste|apt|unit|bldg|building|#)\s*[\w\d-]+/i, '').replace(/,/g, '').trim();
-                    let queryCity = String(acc['City, State, Zip']).replace(/^[,\s]+|[,\s]+$/g, '').trim();
-                    let query = `${queryStreet}, ${queryCity}`.replace(/^[,\s]+|[,\s]+$/g, '').trim();
-                    let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
-                    let data = await response.json();
-                    
-                    if (data && data.length > 0) {
-                        acc.lat = parseFloat(data[0].lat);
-                        acc.lon = parseFloat(data[0].lon);
-                    } else {
-                        let cityResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(queryCity)}`);
-                        let cityData = await cityResponse.json();
-                        if (cityData && cityData.length > 0) {
-                            acc.lat = parseFloat(cityData[0].lat);
-                            acc.lon = parseFloat(cityData[0].lon);
-                        } else {
-                            acc.lat = userLat + (Math.random() * 0.05 - 0.025);
-                            acc.lon = userLon + (Math.random() * 0.05 - 0.025);
-                        }
-                    }
-                } catch (e) {
-                    acc.lat = userLat + (Math.random() * 0.05 - 0.025);
-                    acc.lon = userLon + (Math.random() * 0.05 - 0.025);
+        
+        for (let acc of needsGeo) {
+            document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${needsGeo.length}...\n(1 address/sec via OpenStreetMap)`;
+            try {
+                let query = `${acc.Street_Address}, ${acc['City, State, Zip']}`.trim();
+                let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
+                let data = await response.json();
+                
+                if (data && data.length > 0) {
+                    acc.lat = parseFloat(data[0].lat);
+                    acc.lon = parseFloat(data[0].lon);
+                } else {
+                    acc.lat = userLat + (Math.random() * 0.06 - 0.03);
+                    acc.lon = userLon + (Math.random() * 0.06 - 0.03);
                 }
-                processed++;
-                await new Promise(r => setTimeout(r, 1100)); 
+            } catch (e) {
+                acc.lat = userLat + (Math.random() * 0.06 - 0.03);
+                acc.lon = userLon + (Math.random() * 0.06 - 0.03);
             }
+            processed++;
+            await new Promise(r => setTimeout(r, 1050));
         }
         document.getElementById('loading-overlay').style.display = 'none';
         return accounts;
     }
 
     function openManualModal() { document.getElementById('manual-modal').classList.add('active'); }
-
     function closeManualModal() {
         document.getElementById('manual-modal').classList.remove('active');
-        document.getElementById('manual-name').value = ''; document.getElementById('manual-street').value = '';
-        document.getElementById('manual-city').value = ''; document.getElementById('manual-contact').value = ''; document.getElementById('manual-phone').value = '';
+        ['manual-name','manual-street','manual-city','manual-contact','manual-title','manual-phone','manual-insp'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
     }
 
     async function saveManualLead() {
         let name = extractTextData(document.getElementById('manual-name').value);
         let street = extractTextData(document.getElementById('manual-street').value);
-        if(!name || !street) { alert("Business Name and Street Address are required."); return; }
+        if (!name || !street) { alert("Property Name and Street Address are required."); return; }
 
         let key = `${name.toLowerCase()}|${street.toLowerCase()}`;
-        if (allAccounts.findIndex(acc => acc.id === key) >= 0) { alert("This account already exists in your list."); return; }
+        if (allAccounts.findIndex(acc => acc.id === key) >= 0) { alert("This property already exists."); return; }
 
         let newLead = [{
-            id: key, Business_Name: name, Street_Address: street,
+            id: key,
+            Business_Name: name,
+            Street_Address: street,
             'City, State, Zip': extractTextData(document.getElementById('manual-city').value), 
-            Contact_Name: extractTextData(document.getElementById('manual-contact').value), Phone: extractTextData(document.getElementById('manual-phone').value), 
-            visited: false, surveys: [], alarms: []
+            Contact_Name: extractTextData(document.getElementById('manual-contact').value),
+            Job_Title: extractTextData(document.getElementById('manual-title').value),
+            Phone: extractTextData(document.getElementById('manual-phone').value),
+            Inspection_Date: document.getElementById('manual-insp').value || '',
+            Alarm_Date: '',
+            Alarm_Notes: '',
+            visited: false,
+            surveys: [] 
         }];
 
         let geocodedLead = await runRealGeocoder(newLead);
@@ -647,125 +750,203 @@
         document.getElementById('data-status-container').style.display = 'block';
         document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
         
-        closeManualModal(); filterMap();
+        closeManualModal();
+        filterMap();
     }
 
-    function filterMap() {
-        markersLayer.clearLayers(); closeSheet();
+    /* =======================================================
+       FILTERING, MAP PINS & CLOSEST LEADS LIST VIEW
+       ======================================================= */
+
+    function filterMap(autoFit = true) {
+        markersLayer.clearLayers();
         let radius = parseFloat(document.getElementById('radius-slider').value);
-        let showActiveAlarmsOnly = document.getElementById('alarm-filter-toggle').checked;
-        let showUpcomingInspectionsOnly = document.getElementById('inspection-filter-toggle').checked;
-        
-        let matchCount = 0; let bounds = L.latLngBounds();
+        let searchQuery = (document.getElementById('search-input').value || '').trim().toLowerCase();
+        let anyToggleOn = activeFilters.alarm || activeFilters.insp || activeFilters.defic;
+
+        let bounds = L.latLngBounds();
+        currentFilteredAccounts = [];
 
         allAccounts.forEach(acc => {
             if (!acc.lat || !acc.lon) return;
-            
-            acc.hasUpcomingInspection = false;
-            if (isWithin90DaysAnnual(acc.Inspection_Date)) acc.hasUpcomingInspection = true;
-            if (acc.surveys && acc.surveys.length > 0) {
-                acc.surveys.forEach(bldg => {
-                    if (isWithin90DaysAnnual(bldg.inspectionDue)) acc.hasUpcomingInspection = true;
-                });
+
+            let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
+            if (distance > radius) return;
+
+            // Search Filter: Contact Name, Property Name, or Address
+            if (searchQuery) {
+                let searchable = `${acc.Business_Name || ''} ${acc.Contact_Name || ''} ${acc.Street_Address || ''} ${acc['City, State, Zip'] || ''}`.toLowerCase();
+                if (!searchable.includes(searchQuery)) return;
             }
 
-            let isHighPriorityTarget = false;
-            if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
-                if (showActiveAlarmsOnly && acc.hasActiveAlarm) isHighPriorityTarget = true;
-                if (showUpcomingInspectionsOnly && acc.hasUpcomingInspection) isHighPriorityTarget = true;
-                if (!isHighPriorityTarget) return; 
-            } else {
-                let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
-                if (distance > radius) return;
+            let status = evaluateAccountStatus(acc);
+
+            // Toggle Switches Filter
+            if (anyToggleOn) {
+                let matchesToggle = (activeFilters.alarm && status.isAlarm30d) ||
+                                    (activeFilters.insp && status.isInspDue60d) ||
+                                    (activeFilters.defic && status.isDefic45d);
+                if (!matchesToggle) return;
             }
-            
-            let pinIcon = defaultIcon;
-            if (acc.hasActiveAlarm) {
-                pinIcon = fireTruckIcon; 
-            } else if (acc.hasUpcomingInspection) {
-                pinIcon = fireIcon;
-            } else if (acc.visited) {
-                pinIcon = visitedIcon;
-            }
-            
-            let marker = L.marker([acc.lat, acc.lon], { icon: pinIcon });
-            marker.on('click', () => showDetails(acc, calculateDistance(userLat, userLon, acc.lat, acc.lon)));
+
+            acc._distance = distance;
+            acc._status = status;
+            let badgeObj = getAccountBadgeAndIcon(acc, status);
+            acc._emoji = badgeObj.emoji;
+
+            let marker = L.marker([acc.lat, acc.lon], { icon: badgeObj.icon });
+            marker.on('click', () => showDetails(acc));
             markersLayer.addLayer(marker);
+
             bounds.extend([acc.lat, acc.lon]);
-            matchCount++;
+            currentFilteredAccounts.push(acc);
         });
 
-        if (matchCount > 0) {
-            if (showActiveAlarmsOnly || showUpcomingInspectionsOnly) {
-                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
-            } else {
-                map.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
-            }
-        } else {
-            map.setView([userLat, userLon], 10);
+        // Sort by closest to user GPS
+        currentFilteredAccounts.sort((a, b) => a._distance - b._distance);
+
+        renderClosestList();
+
+        if (autoFit && currentFilteredAccounts.length > 0) {
+            map.fitBounds(bounds, { padding: [25, 25], maxZoom: 14 });
         }
     }
 
-    function showDetails(acc, distance) {
+    function renderClosestList() {
+        const listEl = document.getElementById('lead-list');
+        const countEl = document.getElementById('list-count');
+        countEl.innerText = `${currentFilteredAccounts.length} match${currentFilteredAccounts.length === 1 ? '' : 'es'}`;
+
+        if (currentFilteredAccounts.length === 0) {
+            listEl.innerHTML = `<div style="padding: 18px; text-align: center; color: #888; font-size: 0.85rem;">No leads match your current radius/filters.</div>`;
+            return;
+        }
+
+        let html = '';
+        currentFilteredAccounts.slice(0, 100).forEach(acc => {
+            let contactStr = acc.Contact_Name ? ` • 👤 ${acc.Contact_Name}` : '';
+            html += `
+                <div class="lead-row" onclick="selectLeadFromList('${encodeURIComponent(acc.id)}')">
+                    <div class="lead-row-main">
+                        <span class="lead-badge">${acc._emoji}</span>
+                        <div class="lead-text">
+                            <div class="lead-name">${acc.Business_Name}</div>
+                            <div class="lead-sub">${acc.Street_Address}${contactStr}</div>
+                        </div>
+                    </div>
+                    <div class="lead-dist">${acc._distance.toFixed(1)} mi</div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    }
+
+    function selectLeadFromList(encodedId) {
+        let id = decodeURIComponent(encodedId);
+        let acc = currentFilteredAccounts.find(a => a.id === id) || allAccounts.find(a => a.id === id);
+        if (acc) {
+            map.setView([acc.lat, acc.lon], 15);
+            showDetails(acc);
+        }
+    }
+
+    /* =======================================================
+       DIRECTIONAL COMPASS NAVIGATION (N / S / E / W)
+       ======================================================= */
+
+    function navigateDirection(dir) {
+        if (!currentSelectedAccount) return;
+        let curLat = currentSelectedAccount.lat;
+        let curLon = currentSelectedAccount.lon;
+
+        // Pool of candidates: use active filtered leads if > 1, otherwise all accounts
+        let pool = currentFilteredAccounts.length > 1 ? currentFilteredAccounts : allAccounts;
+        let coneCandidates = [];
+        let halfPlaneCandidates = [];
+
+        pool.forEach(acc => {
+            if (acc.id === currentSelectedAccount.id || !acc.lat || !acc.lon) return;
+            let dLat = acc.lat - curLat;
+            let dLon = acc.lon - curLon;
+            let dist = calculateDistance(curLat, curLon, acc.lat, acc.lon);
+
+            let inHalfPlane = false;
+            let inCone = false;
+
+            if (dir === 'N' && dLat > 0) {
+                inHalfPlane = true;
+                if (Math.abs(dLat) >= Math.abs(dLon)) inCone = true;
+            } else if (dir === 'S' && dLat < 0) {
+                inHalfPlane = true;
+                if (Math.abs(dLat) >= Math.abs(dLon)) inCone = true;
+            } else if (dir === 'E' && dLon > 0) {
+                inHalfPlane = true;
+                if (Math.abs(dLon) >= Math.abs(dLat)) inCone = true;
+            } else if (dir === 'W' && dLon < 0) {
+                inHalfPlane = true;
+                if (Math.abs(dLon) >= Math.abs(dLat)) inCone = true;
+            }
+
+            if (inCone) coneCandidates.push({ acc, dist });
+            else if (inHalfPlane) halfPlaneCandidates.push({ acc, dist });
+        });
+
+        let targetList = coneCandidates.length > 0 ? coneCandidates : halfPlaneCandidates;
+        if (targetList.length === 0) {
+            alert(`No further locations found to the ${dir === 'N' ? 'North' : dir === 'S' ? 'South' : dir === 'E' ? 'East' : 'West'}.`);
+            return;
+        }
+
+        targetList.sort((a, b) => a.dist - b.dist);
+        let nextAcc = targetList[0].acc;
+        map.panTo([nextAcc.lat, nextAcc.lon]);
+        showDetails(nextAcc);
+    }
+
+    /* =======================================================
+       RECORD PAGE (BOTTOM SHEET) UI
+       ======================================================= */
+
+    function showDetails(acc) {
         currentSelectedAccount = acc;
+        let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
+        let status = acc._status || evaluateAccountStatus(acc);
+
         document.getElementById('sheet-title').innerText = acc.Business_Name || 'Unknown Business';
-        
         let cleanCityState = extractTextData(acc['City, State, Zip']);
-        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cleanCityState} (${distance.toFixed(1)} mi)`;
+        document.getElementById('sheet-address').innerText = `${acc.Street_Address || ''}, ${cleanCityState} (${distance.toFixed(1)} mi from you)`;
         
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
+        document.getElementById('sheet-jobtitle').innerText = acc.Job_Title ? `🏷️ ${acc.Job_Title}` : '';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
-        
-        let titleElem = document.getElementById('sheet-job-title');
-        if (acc.Job_Title) {
-            titleElem.style.display = 'block';
-            titleElem.innerText = acc.Job_Title;
+
+        // Status Banner & Inspection/Alarm Details
+        let banner = document.getElementById('sheet-status-banner');
+        let badges = [];
+        if (status.isAlarm30d) badges.push(`🚒 Alarm (${status.daysSinceAlarm}d ago)`);
+        if (status.isDefic45d) badges.push(`🔧 Deficiency Window (Day ${status.daysSinceInsp}/45)`);
+        if (status.isInspDue60d) badges.push(`🔥 Insp Due in ${status.daysUntilInsp}d (${status.inspMonthName} 1)`);
+
+        if (badges.length > 0) {
+            banner.style.display = 'block';
+            banner.style.background = status.isAlarm30d ? '#ffebee' : status.isDefic45d ? '#e3f2fd' : '#fff3e0';
+            banner.style.color = status.isAlarm30d ? '#b71c1c' : status.isDefic45d ? '#0d47a1' : '#e65100';
+            banner.innerText = badges.join('  •  ');
         } else {
-            titleElem.style.display = 'none';
+            banner.style.display = 'none';
         }
-        
-        let inspContainer = document.getElementById('sheet-insp-container');
-        if (acc.Inspection_Date) {
-            inspContainer.style.display = 'block';
-            document.getElementById('sheet-insp-date').innerText = acc.Inspection_Date;
-        } else {
-            inspContainer.style.display = 'none';
-        }
+
+        document.getElementById('sheet-insp').innerText = status.inspMonthName ? `${status.inspMonthName} 1st (Annual)` : (acc.Inspection_Date || 'N/A');
+        document.getElementById('sheet-alarm').innerText = acc.Alarm_Date ? `${acc.Alarm_Date}${acc.Alarm_Notes ? ' - ' + acc.Alarm_Notes : ''}` : 'None Recorded';
         
         document.getElementById('action-nav').href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
         
         let callBtn = document.getElementById('action-call');
-        if (acc.Phone) { callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`; callBtn.style.display = 'flex'; } 
-        else { callBtn.style.display = 'none'; }
-        
-        let alarmContainer = document.getElementById('alarm-history-container');
-        if (acc.alarms && acc.alarms.length > 0) {
-            alarmContainer.style.display = 'block';
-            document.getElementById('alarm-count-badge').innerText = acc.alarms.length;
-            
-            let listHtml = '';
-            let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
-            
-            sortedAlarms.forEach(al => {
-                let badge = al.active ? `<span style="color:#d32f2f; font-weight:bold; font-size:0.75rem; margin-left:8px;">(Last 45 Days)</span>` : '';
-                listHtml += `
-                    <div class="alarm-item">
-                        <strong>${al.date || 'Unknown Date'}</strong> ${badge}
-                        <div style="color: #666; margin-top:2px;">${al.notes || 'No description provided.'}</div>
-                    </div>
-                `;
-            });
-            document.getElementById('alarm-list-content').innerHTML = listHtml;
-            
-            if (acc.hasActiveAlarm) {
-                document.querySelector('.alarm-header').style.background = '#d32f2f';
-                document.getElementById('alarm-count-badge').style.color = '#d32f2f';
-            } else {
-                document.querySelector('.alarm-header').style.background = '#757575';
-                document.getElementById('alarm-count-badge').style.color = '#757575';
-            }
+        if (acc.Phone) {
+            callBtn.href = `tel:${String(acc.Phone).replace(/[^0-9]/g, '')}`;
+            callBtn.style.display = 'flex';
         } else {
-            alarmContainer.style.display = 'none';
+            callBtn.style.display = 'none';
         }
         
         updateVisitButtonUI();
@@ -776,27 +957,39 @@
         if (!currentSelectedAccount) return;
         currentSelectedAccount.visited = !currentSelectedAccount.visited;
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-        updateVisitButtonUI(); filterMap();
-        let distance = calculateDistance(userLat, userLon, currentSelectedAccount.lat, currentSelectedAccount.lon);
-        showDetails(currentSelectedAccount, distance);
+        updateVisitButtonUI();
+        filterMap(false);
+        showDetails(currentSelectedAccount);
     }
     
     function updateVisitButtonUI() {
         let visitBtn = document.getElementById('action-visit');
-        if (currentSelectedAccount.visited) { visitBtn.innerText = "↩ Undo Visit"; visitBtn.style.background = "#e0e0e0"; visitBtn.style.color = "#333"; } 
-        else { visitBtn.innerText = "✓ Mark Visited"; visitBtn.style.background = "#757575"; visitBtn.style.color = "white"; }
+        if (currentSelectedAccount.visited) {
+            visitBtn.innerText = "↩ Undo Visit";
+            visitBtn.style.background = "#e0e0e0";
+            visitBtn.style.color = "#333";
+        } else {
+            visitBtn.innerText = "✓ Mark Visited";
+            visitBtn.style.background = "#757575";
+            visitBtn.style.color = "white";
+        }
     }
 
-    function closeSheet() { document.getElementById('bottom-sheet').classList.remove('active'); currentSelectedAccount = null; }
+    function closeSheet() {
+        document.getElementById('bottom-sheet').classList.remove('active');
+        currentSelectedAccount = null;
+    }
+
+    /* =======================================================
+       SURVEY BUILDER, PDF PRINT & EMAIL REPORT
+       ======================================================= */
 
     function openSurvey() {
-        if(!currentSelectedAccount) return;
+        if (!currentSelectedAccount) return;
         document.getElementById('survey-modal-title').innerText = `Survey: ${currentSelectedAccount.Business_Name}`;
-        
-        if(!currentSelectedAccount.surveys || currentSelectedAccount.surveys.length === 0) {
+        if (!currentSelectedAccount.surveys || currentSelectedAccount.surveys.length === 0) {
             currentSelectedAccount.surveys = [createNewBuilding('Building 1')];
         }
-        
         renderSurveys();
         document.getElementById('survey-modal').classList.add('active');
     }
@@ -804,7 +997,6 @@
     function closeSurvey() {
         document.getElementById('survey-modal').classList.remove('active');
         localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
-        filterMap(); 
     }
 
     function createNewBuilding(name) {
@@ -824,9 +1016,9 @@
 
     function updateCount(bldgId, fieldId, change) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
-        if(bldg) {
+        if (bldg) {
             let current = parseInt(bldg.counts[fieldId]) || 0;
-            let newVal = current + change; if(newVal < 0) newVal = 0;
+            let newVal = Math.max(0, current + change);
             bldg.counts[fieldId] = newVal;
             document.getElementById(`count-${bldgId}-${fieldId}`).value = newVal;
             saveSurveyState();
@@ -835,16 +1027,15 @@
 
     function setManualCount(bldgId, fieldId, value) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
-        if(bldg) {
-            let newVal = parseInt(value) || 0; if(newVal < 0) newVal = 0;
-            bldg.counts[fieldId] = newVal;
+        if (bldg) {
+            bldg.counts[fieldId] = Math.max(0, parseInt(value) || 0);
             saveSurveyState();
         }
     }
 
     function updateTextField(bldgId, field, value) {
         let bldg = currentSelectedAccount.surveys.find(b => b.id === bldgId);
-        if(bldg) { bldg[field] = extractTextData(value); saveSurveyState(); }
+        if (bldg) { bldg[field] = extractTextData(value); saveSurveyState(); }
     }
 
     function handlePhotoUpload(event, bldgId, targetArray) {
@@ -862,8 +1053,10 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 500; const scaleSize = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH; canvas.height = img.height * scaleSize;
+                    const MAX_WIDTH = 500;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     
@@ -871,7 +1064,8 @@
                     if (!bldg[targetArray]) bldg[targetArray] = [];
                     bldg[targetArray].push(dataUrl);
                     
-                    saveSurveyState(); renderSurveys();
+                    saveSurveyState();
+                    renderSurveys();
                     document.getElementById('loading-overlay').style.display = 'none';
                 }
                 img.src = e.target.result;
@@ -884,7 +1078,7 @@
         const container = document.getElementById('survey-content');
         container.innerHTML = '';
         
-        currentSelectedAccount.surveys.forEach((bldg, index) => {
+        currentSelectedAccount.surveys.forEach(bldg => {
             let html = `
                 <div class="building-card">
                     <div class="bldg-header">
@@ -908,7 +1102,7 @@
                         </select>
                     </div>
                     <div style="background:#f5f5f5; padding:10px; border-radius:6px; margin-bottom:15px;">
-                        <label style="display:block; margin-bottom:10px; font-size:0.95rem;">📸 Asset Photos</label>
+                        <label style="display:block; margin-bottom:10px; font-size:0.9rem;">📸 Asset Photos</label>
                         <input type="file" accept="image/*" multiple onchange="handlePhotoUpload(event, '${bldg.id}', 'photos')" style="margin-bottom:10px;">
                         <div class="photo-grid">${(bldg.photos || []).map(p => `<img src="${p}" class="photo-thumb">`).join('')}</div>
                     </div>
@@ -946,14 +1140,12 @@
                     </div>
                 </div>
             `;
-            
             container.innerHTML += html;
         });
     }
 
     function generatePDF() {
         if (!currentSelectedAccount) return;
-        
         let acc = currentSelectedAccount;
         let cleanCityState = extractTextData(acc['City, State, Zip']);
         
@@ -986,34 +1178,18 @@
 
             if (bldg.photos && bldg.photos.length > 0) {
                 pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 15px;">Asset Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
-                bldg.photos.forEach(p => { 
-                    pdfHtml += `<img src="${p}" style="height: 200px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
-                });
+                bldg.photos.forEach(p => { pdfHtml += `<img src="${p}" style="height: 200px; border-radius: 4px; border: 1px solid #ddd; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; });
                 pdfHtml += `</div>`;
             }
 
             if (bldg.tagPhotos && bldg.tagPhotos.length > 0) {
                 pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 15px;">Deficiency Photos:</h4><div style="display: block; margin-bottom: 15px;">`;
-                bldg.tagPhotos.forEach(p => { 
-                    pdfHtml += `<img src="${p}" style="height: 200px; border-radius: 4px; border: 2px solid #d32f2f; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; 
-                });
+                bldg.tagPhotos.forEach(p => { pdfHtml += `<img src="${p}" style="height: 200px; border-radius: 4px; border: 2px solid #d32f2f; margin-right: 10px; margin-bottom: 10px; display: inline-block;">`; });
                 pdfHtml += `</div>`;
             }
 
             pdfHtml += `</div>`;
         });
-
-        if (acc.alarms && acc.alarms.length > 0) {
-            pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ffcdd2; border-radius: 8px;">`;
-            pdfHtml += `<h3 style="margin-top: 0; color: #d32f2f; margin-bottom: 10px;">Alarm Dispatch History</h3>`;
-            pdfHtml += `<ul style="margin-top: 5px; margin-bottom: 5px; font-size: 14px;">`;
-            
-            let sortedAlarms = [...acc.alarms].sort((a,b) => new Date(b.date) - new Date(a.date));
-            sortedAlarms.forEach(al => {
-                pdfHtml += `<li style="margin-bottom: 6px;"><strong>${al.date || 'Unknown Date'}:</strong> ${al.notes || 'No description provided.'}</li>`;
-            });
-            pdfHtml += `</ul></div>`;
-        }
 
         pdfHtml += `<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ccc; font-size: 13px; line-height: 1.4;">`;
         pdfHtml += `Seth Peterson<br>Service Sales Rep<br>Firetrol Protection Systems<br>Texas Licensed Fire Extinguisher Technician FEL-B-3464192<br>4616 W. Howard Lane<br>Ste #7-700<br>Austin, TX 78728<br>737-297-5660`;
@@ -1034,9 +1210,7 @@
     function emailReport() {
         let acc = currentSelectedAccount;
         let cleanCityState = extractTextData(acc['City, State, Zip']);
-                                
         let subject = encodeURIComponent(`Site Survey: ${acc.Business_Name}`);
-        
         let body = `Site Survey: ${acc.Business_Name}\n${acc.Street_Address}, ${cleanCityState}\n\n`;
 
         acc.surveys.forEach(bldg => {
@@ -1047,27 +1221,23 @@
             
             body += `\nDevice Inventory to Test (Estimated Totals):\n`;
             let hasDevices = false;
-            
             SURVEY_FIELDS.forEach(f => {
                 if (bldg.counts[f.id] > 0) {
                     body += `- ${bldg.counts[f.id]} ${f.label}\n`;
                     hasDevices = true;
                 }
             });
+            if (!hasDevices) body += `- No devices quantified.\n`;
             
-            if(!hasDevices) body += `- No devices quantified.\n`;
-            
-            if(bldg.hasTags || bldg.notes) {
+            if (bldg.hasTags || bldg.notes) {
                 body += `\nNotes & Deficiencies:\n`;
-                if(bldg.hasTags) body += `- Tag Status: ${bldg.hasTags}\n`;
-                if(bldg.notes) body += `- Notes: ${bldg.notes}\n`;
+                if (bldg.hasTags) body += `- Tag Status: ${bldg.hasTags}\n`;
+                if (bldg.notes) body += `- Notes: ${bldg.notes}\n`;
             }
-            
             body += `\n=================================\n\n`;
         });
         
-        body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
-        
+        body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700<br>Austin, TX 78728\n737-297-5660`.replace('<br>', '\n');
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
     }
 
