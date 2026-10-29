@@ -57,7 +57,7 @@
         /* Closest Leads List View Underneath Map */
         #list-panel { flex: 0.85; background: white; border-top: 2px solid #ddd; display: flex; flex-direction: column; overflow: hidden; z-index: 500; }
         #list-header { padding: 7px 12px; background: #eee; font-size: 0.8rem; font-weight: bold; color: #333; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
-        #lead-list { flex: 1; overflow-y: auto; divide-y: 1px solid #f0f0f0; }
+        #lead-list { flex: 1; overflow-y: auto; }
         .lead-row { padding: 10px 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .lead-row:active { background: #f5f5f5; }
         .lead-row-main { display: flex; align-items: center; gap: 10px; overflow: hidden; }
@@ -68,7 +68,7 @@
         .lead-dist { font-weight: bold; font-size: 0.82rem; color: var(--primary); flex-shrink: 0; margin-left: 8px; }
 
         /* Bottom Sheet (Record Page) */
-        #bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 18px; border-top-right-radius: 18px; padding: 14px 18px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 18px rgba(0,0,0,0.25); transform: translateY(115%); transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2000; max-height: 85vh; overflow-y: auto; }
+        #bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-top-left-radius: 18px; border-top-right-radius: 18px; padding: 14px 18px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -4px 18px rgba(0,0,0,0.25); transform: translateY(115%); transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1); z-index: 2000; max-height: 86vh; overflow-y: auto; }
         #bottom-sheet.active { transform: translateY(0); }
 
         /* Directional Navigation Bar at Top of Record Page */
@@ -78,22 +78,36 @@
         .dir-btn { flex: 1; max-width: 68px; padding: 7px 0; background: white; border: 1px solid #ccc; border-radius: 6px; font-weight: bold; font-size: 0.82rem; color: #333; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 2px; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
         .dir-btn:active { background: #e0e0e0; }
         
-        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+        .sheet-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
         .sheet-title { font-size: 1.2rem; font-weight: bold; color: var(--text); margin: 0; }
         .sheet-subtitle { font-size: 0.85rem; color: #666; margin: 3px 0 0 0; }
         .close-btn { background: none; color: #999; font-size: 1.8rem; border: none; padding: 0 4px; line-height: 1; margin-top: -4px; cursor: pointer; }
         
-        .status-banner { padding: 8px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: bold; margin-bottom: 12px; display: none; }
+        .status-banner { padding: 8px 10px; border-radius: 6px; font-size: 0.82rem; font-weight: bold; margin-bottom: 10px; display: none; }
         
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
         .info-item { font-size: 0.82rem; color: #555; }
-        .info-item strong { display: block; color: var(--text); font-size: 0.88rem; margin-bottom: 2px; }
+        .info-item strong { display: block; color: var(--text); font-size: 0.86rem; margin-bottom: 2px; }
+
+        /* Dedicated CRM Notes & Historical Alarms Boxes on Property Card */
+        .card-box { background: #f8f9fa; border: 1px solid #e0e4e8; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+        .card-box-notes { background: #fffdf5; border-color: #ffe082; }
+        .card-box-alarms { background: #fff5f5; border-color: #ffcdd2; }
+        .card-box-header { font-size: 0.82rem; font-weight: bold; color: #333; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
+        .note-list { max-height: 135px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; font-size: 0.82rem; line-height: 1.38; color: #222; }
+        .note-entry { background: white; border-left: 3px solid #ffa000; padding: 6px 8px; border-radius: 4px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); word-break: break-word; }
+        .alarm-entry { background: white; border-left: 3px solid #d32f2f; padding: 5px 8px; border-radius: 4px; font-size: 0.8rem; }
+        .note-date-tag { font-weight: bold; color: #b26a00; font-size: 0.76rem; margin-right: 4px; }
+        .quick-note-row { display: flex; gap: 6px; margin-top: 8px; }
+        .quick-note-row input { flex: 1; padding: 6px 8px; font-size: 0.8rem; border: 1px solid #ccc; border-radius: 5px; }
+        .quick-note-row button { background: #ffa000; color: white; border: none; border-radius: 5px; padding: 6px 10px; font-weight: bold; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
         
         .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .action-btn { padding: 11px; text-align: center; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 0.9rem; color: white; display: flex; justify-content: center; align-items: center; gap: 6px; cursor: pointer; border: none; }
         .nav-btn { background: #f57c00; }
         .call-btn { background: #2e7d32; }
-        .survey-btn { background: #673ab7; grid-column: span 2; padding: 14px; font-size: 1rem; }
+        .email-lead-btn { background: #1976d2; grid-column: span 2; }
+        .survey-btn { background: #673ab7; grid-column: span 2; padding: 13px; font-size: 0.98rem; }
         .visit-btn { background: #757575; grid-column: span 2; }
         
         /* Survey Modal & Manual Lead Modal */
@@ -163,20 +177,20 @@
         </div>
 
         <div class="control-group" id="upload-group">
-            <label>Upload Master CRM Export (CSV)</label>
+            <label>Upload Master_Firetrackr_Leads.csv</label>
             <input type="file" id="csv-file" accept=".csv">
         </div>
 
         <!-- Search Bar -->
         <div class="row">
-            <input type="text" id="search-input" placeholder="🔍 Search property, contact name, or address..." oninput="filterMap()">
+            <input type="text" id="search-input" placeholder="🔍 Search property, contact, address, or notes..." oninput="filterMap()">
         </div>
         
         <!-- Radius Slider -->
         <div class="row">
             <div class="control-group" style="flex: 1;">
-                <label>Radius: <span id="radius-val">10</span> miles</label>
-                <input type="range" id="radius-slider" min="1" max="100" value="10" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
+                <label>Radius: <span id="radius-val">25</span> miles</label>
+                <input type="range" id="radius-slider" min="1" max="100" value="25" oninput="document.getElementById('radius-val').innerText = this.value; filterMap();">
             </div>
         </div>
 
@@ -232,9 +246,13 @@
             <label>Phone</label>
             <input type="text" id="manual-phone">
         </div>
-        <div class="control-group" style="margin-bottom: 14px;">
+        <div class="control-group" style="margin-bottom: 8px;">
             <label>Inspection Due Date</label>
             <input type="date" id="manual-insp">
+        </div>
+        <div class="control-group" style="margin-bottom: 14px;">
+            <label>Initial Lead Notes</label>
+            <textarea id="manual-notes" placeholder="Enter any initial notes for this property..."></textarea>
         </div>
         <div style="display: flex; gap: 10px;">
             <button onclick="closeManualModal()" style="flex: 1; padding: 10px; background: #9e9e9e; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer;">Cancel</button>
@@ -243,7 +261,7 @@
     </div>
 </div>
 
-<!-- Record Detail Sheet -->
+<!-- Record Detail Sheet (Property Card) -->
 <div id="bottom-sheet">
     <!-- Directional Compass Navigation Bar -->
     <div class="dir-nav-bar">
@@ -273,23 +291,47 @@
             <div id="sheet-jobtitle" style="font-size: 0.78rem; color: #777; margin-top: 2px;"></div>
         </div>
         <div class="info-item">
-            <strong>Phone</strong>
+            <strong>Phone & Email</strong>
             <span id="sheet-phone">N/A</span>
+            <div id="sheet-email" style="font-size: 0.76rem; color: #1976d2; margin-top: 2px; word-break: break-all;"></div>
         </div>
         <div class="info-item">
             <strong>Inspection Cycle (1st)</strong>
             <span id="sheet-insp">N/A</span>
+            <div id="sheet-insp-source" style="font-size: 0.74rem; color: #777; margin-top: 2px;"></div>
         </div>
         <div class="info-item">
-            <strong>Last Alarm</strong>
+            <strong>Last Fire Alarm</strong>
             <span id="sheet-alarm">None Recorded</span>
         </div>
+    </div>
+
+    <!-- Dedicated CRM Lead Notes Box on Property Card -->
+    <div class="card-box card-box-notes" id="sheet-notes-box">
+        <div class="card-box-header">
+            <span id="sheet-notes-header">📋 CRM Lead Notes</span>
+            <span id="sheet-notes-latest" style="font-size: 0.74rem; color: #8d6e63; font-weight: normal;"></span>
+        </div>
+        <div class="note-list" id="sheet-notes-list"></div>
+        <div class="quick-note-row">
+            <input type="text" id="quick-note-input" placeholder="Add a quick field note to this lead...">
+            <button onclick="addQuickLeadNote()">+ Save Note</button>
+        </div>
+    </div>
+
+    <!-- Historical Fire Alarms Audit Box (Displayed when property has dispatch history) -->
+    <div class="card-box card-box-alarms" id="sheet-alarms-box" style="display: none;">
+        <div class="card-box-header">
+            <span id="sheet-alarms-header">🚒 Historical AFD Alarm Dispatches</span>
+        </div>
+        <div class="note-list" id="sheet-alarms-list"></div>
     </div>
     
     <div class="actions">
         <button class="action-btn survey-btn" onclick="openSurvey()">📝 Build Report & Survey</button>
         <a href="#" id="action-nav" class="action-btn nav-btn" target="_blank">🚗 Navigate</a>
         <a href="#" id="action-call" class="action-btn call-btn">📞 Call</a>
+        <a href="#" id="action-email-lead" class="action-btn email-lead-btn" style="display: none;">✉️ Email Contact</a>
         <button id="action-visit" class="action-btn visit-btn" onclick="toggleVisit()">✓ Mark Visited</button>
     </div>
 </div>
@@ -332,6 +374,42 @@
         { id: 'drySprinklers', label: 'Dry Sprinklers' }
     ];
 
+    // Built-in Central Texas ZIP & City Coordinate Lookup for Instant Bulk Fallback
+    const CENTRAL_TX_ZIPS = {
+        '78613': [30.5052, -97.8203], '78641': [30.5788, -97.8531], '78642': [30.6333, -97.9167],
+        '78626': [30.6333, -97.6500], '78628': [30.6478, -97.7169], '78633': [30.7131, -97.7614],
+        '78664': [30.4855, -97.6430], '78665': [30.5519, -97.6322], '78681': [30.5252, -97.7166],
+        '78660': [30.4394, -97.6200], '78634': [30.5427, -97.5467], '78653': [30.3408, -97.5567],
+        '78610': [30.0852, -97.8403], '78640': [29.9891, -97.8772], '78666': [29.8833, -97.9414],
+        '78620': [30.1902, -98.0867], '78669': [30.3958, -98.0850], '78602': [30.1105, -97.3153],
+        '78621': [30.3497, -97.3703], '78734': [30.3664, -97.9614], '78738': [30.3075, -97.9542],
+        '78732': [30.3764, -97.8936], '78717': [30.4892, -97.7719], '78729': [30.4536, -97.7694],
+        '78750': [30.4150, -97.7989], '78759': [30.3986, -97.7492], '78758': [30.3808, -97.7058],
+        '78753': [30.3758, -97.6714], '78754': [30.3547, -97.6347], '78728': [30.4439, -97.6800],
+        '78727': [30.4256, -97.7169], '78757': [30.3514, -97.7347], '78752': [30.3314, -97.7042],
+        '78751': [30.3125, -97.7236], '78756': [30.3219, -97.7417], '78731': [30.3475, -97.7686],
+        '78746': [30.2956, -97.8100], '78703': [30.2897, -97.7636], '78705': [30.2936, -97.7419],
+        '78701': [30.2711, -97.7437], '78702': [30.2636, -97.7169], '78722': [30.2878, -97.7167],
+        '78723': [30.3069, -97.6836], '78721': [30.2686, -97.6811], '78724': [30.2939, -97.6214],
+        '78725': [30.2372, -97.6186], '78741': [30.2303, -97.7156], '78704': [30.2444, -97.7628],
+        '78745': [30.2069, -97.7956], '78748': [30.1683, -97.8228], '78749': [30.2081, -97.8617],
+        '78735': [30.2494, -97.8644], '78736': [30.2361, -97.9297], '78737': [30.1678, -97.9686],
+        '78739': [30.1753, -97.8894], '78744': [30.1844, -97.7381], '78747': [30.1353, -97.7611],
+        '78719': [30.1558, -97.6700], '78617': [30.1536, -97.6119]
+    };
+
+    const CENTRAL_TX_CITIES = {
+        'cedar park': [30.5052, -97.8203], 'round rock': [30.5083, -97.6789],
+        'georgetown': [30.6333, -97.6772], 'pflugerville': [30.4394, -97.6200],
+        'leander': [30.5788, -97.8531], 'lakeway': [30.3664, -97.9614],
+        'bee cave': [30.3075, -97.9542], 'san marcos': [29.8833, -97.9414],
+        'kyle': [29.9891, -97.8772], 'buda': [30.0852, -97.8403],
+        'manor': [30.3408, -97.5567], 'hutto': [30.5427, -97.5467],
+        'dripping springs': [30.1902, -98.0867], 'west lake hills': [30.2956, -97.8100],
+        'sunset valley': [30.2269, -97.8086], 'del valle': [30.1536, -97.6119],
+        'bastrop': [30.1105, -97.3153], 'elgin': [30.3497, -97.3703]
+    };
+
     let map;
     let markersLayer = L.layerGroup();
     let userLocationMarker = null;
@@ -341,7 +419,6 @@
     let userLon = -97.7431;
     let currentSelectedAccount = null;
 
-    // Toggle States
     let activeFilters = {
         alarm: false,
         insp: false,
@@ -398,7 +475,6 @@
         }
     }
 
-    // GPS Re-Center Button Handler
     function centerOnUserGPS() {
         if (!navigator.geolocation) {
             map.setView([userLat, userLon], 14);
@@ -409,7 +485,7 @@
             userLon = pos.coords.longitude;
             updateUserMarker();
             map.setView([userLat, userLon], 14);
-            filterMap(false); // Re-sort distances from new GPS position without overriding zoom
+            filterMap(false);
         }, () => {
             map.setView([userLat, userLon], 14);
         }, { enableHighAccuracy: true, timeout: 6000 });
@@ -422,8 +498,12 @@
     function parseFlexibleDate(str) {
         if (!str) return null;
         let clean = String(str).trim();
-        if (!clean) return null;
-        // Handle Austin Fire Dispatch format e.g. "2026 Apr 11 06:43:38 AM"
+        if (!clean || clean.toLowerCase() === 'nan') return null;
+        // Handle YYYY-MM-DD directly in local time without UTC shift
+        let isoMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoMatch) {
+            return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
+        }
         let parsed = new Date(clean);
         if (!isNaN(parsed.getTime())) return parsed;
         let match = clean.match(/(\d{4})\s+([A-Za-z]{3})\s+(\d{1,2})/);
@@ -459,10 +539,9 @@
 
         let inspDateObj = parseFlexibleDate(acc.Inspection_Date);
         if (inspDateObj) {
-            let inspMonth = inspDateObj.getMonth(); // 0 - 11
+            let inspMonth = inspDateObj.getMonth();
             inspMonthName = inspDateObj.toLocaleString('default', { month: 'short' });
 
-            // Check candidate 1st-of-month dates across previous, current, and next year
             let candidates = [
                 new Date(today.getFullYear() - 1, inspMonth, 1),
                 new Date(today.getFullYear(), inspMonth, 1),
@@ -471,12 +550,10 @@
 
             candidates.forEach(dueFirst => {
                 let diffFromDue = Math.floor((today - dueFirst) / MS_PER_DAY);
-                // Once property hits due date on the 1st (diffFromDue === 0) until 45 days after: Wrench / Deficiency Window
                 if (diffFromDue >= 0 && diffFromDue <= 45) {
                     isDefic45d = true;
                     daysSinceInsp = diffFromDue;
                 }
-                // Within 60 days prior to the 1st of the due month: Inspection Due Window
                 let diffUntilDue = Math.floor((dueFirst - today) / MS_PER_DAY);
                 if (diffUntilDue >= 1 && diffUntilDue <= 60) {
                     isInspDue60d = true;
@@ -533,17 +610,21 @@
     }
 
     /* =======================================================
-       STORAGE & CSV INGESTION
+       STORAGE & MASTER CSV INGESTION
        ======================================================= */
 
     function loadSavedAccounts() {
         let savedData = localStorage.getItem('firetrackr_accounts');
         if (savedData) {
-            allAccounts = JSON.parse(savedData);
-            document.getElementById('upload-group').style.display = 'none';
-            document.getElementById('data-status-container').style.display = 'block';
-            document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
-            filterMap();
+            try {
+                allAccounts = JSON.parse(savedData);
+                document.getElementById('upload-group').style.display = 'none';
+                document.getElementById('data-status-container').style.display = 'block';
+                document.getElementById('data-status-text').innerText = `✅ ${allAccounts.length} Accounts Loaded`;
+                filterMap();
+            } catch (e) {
+                console.error("Saved storage parse error:", e);
+            }
         } else {
             document.getElementById('upload-group').style.display = 'flex';
             document.getElementById('data-status-container').style.display = 'none';
@@ -589,8 +670,41 @@
             } catch (e) { return ''; }
         }
         let strVal = String(value).trim();
-        if (strVal.includes('[object') || strVal === 'undefined' || strVal === 'null') return '';
+        if (strVal.includes('[object') || strVal === 'undefined' || strVal === 'null' || strVal === 'NaN') return '';
         return strVal;
+    }
+
+    // Deterministic hash offset so properties in the same ZIP code don't stack on the exact same pixel
+    function hashJitter(str, scale = 0.009) {
+        let h = 0;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) - h) + str.charCodeAt(i);
+            h |= 0;
+        }
+        return ((h % 1000) / 1000) * scale;
+    }
+
+    function assignInstantCentralTxCoords(acc) {
+        let combined = `${acc.Street_Address || ''} ${acc['City, State, Zip'] || ''}`;
+        let zipMatch = combined.match(/\b(78\d{3})\b/);
+        let baseLat = 30.2672;
+        let baseLon = -97.7431;
+
+        if (zipMatch && CENTRAL_TX_ZIPS[zipMatch[1]]) {
+            baseLat = CENTRAL_TX_ZIPS[zipMatch[1]][0];
+            baseLon = CENTRAL_TX_ZIPS[zipMatch[1]][1];
+        } else {
+            let lower = combined.toLowerCase();
+            for (let cityKey in CENTRAL_TX_CITIES) {
+                if (lower.includes(cityKey)) {
+                    baseLat = CENTRAL_TX_CITIES[cityKey][0];
+                    baseLon = CENTRAL_TX_CITIES[cityKey][1];
+                    break;
+                }
+            }
+        }
+        acc.lat = baseLat + hashJitter(acc.id + '_lat', 0.012);
+        acc.lon = baseLon + hashJitter(acc.id + '_lon', 0.012);
     }
 
     document.getElementById('csv-file').addEventListener('change', function(e) {
@@ -600,57 +714,123 @@
         Papa.parse(file, {
             header: true,
             skipEmptyLines: true,
+            transformHeader: function(h) {
+                return h.replace(/^\uFEFF/, '').trim();
+            },
             complete: async function(results) {
                 let headers = results.meta.fields || [];
+                const findCol = (exactList, regexFallback) => {
+                    for (let ex of exactList) {
+                        let match = headers.find(h => h.toLowerCase() === ex.toLowerCase());
+                        if (match) return match;
+                    }
+                    return regexFallback ? headers.find(regexFallback) : null;
+                };
+
+                // Exact column matcher tailored to Master_Firetrackr_Leads.csv + raw Dynamics exports
+                let nameField = findCol(['Business_Name', 'Topic', 'Company_Name'], h => /topic|business|company|account|property/i.test(h) && !/url|web|email/i.test(h)) || headers[0];
+                let addressField = findCol(['Street_Address', 'Clean_Address', 'Address 1', 'Address_1'], h => /street|address/i.test(h) && !/web|email|mac|ip|city/i.test(h)) || headers[1];
+                let cityStateField = findCol(['City, State, Zip', 'City'], h => /city/i.test(h) && !/capacity/i.test(h));
+                let zipField = findCol(['ZIP/Postal Code', 'ZIP'], h => /zip|postal/i.test(h));
+                let contactField = findCol(['Contact_Name', 'Name', ' Name'], h => /contact|full name|primary contact|first name/i.test(h) && !/url|web|email/i.test(h));
+                let titleField = findCol(['Job Title', 'Job_Title'], h => /job title|title|role|position/i.test(h));
+                let phoneField = findCol(['Phone', 'Business Phone'], h => /phone|mobile|cell/i.test(h));
+                let emailField = findCol(['Email', 'E-mail'], h => /^email|e-mail/i.test(h));
+                let inspField = findCol(['Inspection_Date', 'Inspection Due Date'], h => /inspection_date|inspection due date|due date/i.test(h));
+                let inspSourceField = findCol(['Inspection_Date_Source']);
+                let coIssuedField = findCol(['CO_Original_Issued_Date']);
                 
-                let nameField = headers.find(h => /topic|business|company|account|property/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /name/i.test(h) && !/contact|first|last|url|web|email/i.test(h)) || headers[0];
-                let addressField = headers.find(h => /street 1|address 1/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers.find(h => /street|address/i.test(h) && !/web|email|mac|ip/i.test(h)) || headers[1];
-                let cityStateField = headers.find(h => /city/i.test(h) && !/capacity/i.test(h)) || headers.find(h => /zip|postal/i.test(h)) || headers[2];
-                let contactField = headers.find(h => /contact|full name|primary contact/i.test(h) && !/url|web|email/i.test(h)) || headers.find(h => /first name|last name/i.test(h)) || headers[3];
-                let titleField = headers.find(h => /job title|title|role|position/i.test(h));
-                let phoneField = headers.find(h => /phone|mobile|cell/i.test(h)) || headers[4];
-                let inspField = headers.find(h => /inspection|due date|insp/i.test(h));
-                let alarmDateField = headers.find(h => /alarm date|incident date|dispatch/i.test(h));
-                let alarmNotesField = headers.find(h => /alarm note|incident|problem/i.test(h));
-                let latField = headers.find(h => /^lat|latitude/i.test(h));
-                let lonField = headers.find(h => /^lon|^lng|longitude/i.test(h));
+                // CRM Notes columns
+                let notesField = findCol(['Notes', 'All_Notes_Chronological', 'Latest_CRM_Note', 'Clean_Note'], h => /^notes$|crm_note|combined_notes/i.test(h));
+                let latestNoteField = findCol(['Latest_CRM_Note', 'Latest_Note']);
+                let noteCountField = findCol(['Note_Count']);
+                let latestNoteDateField = findCol(['Latest_Note_Date']);
+
+                // Fire Alarm columns (explicitly avoiding Fire_Incident_Count for Alarm Notes)
+                let alarmDateField = findCol(['Alarm Date', 'Alarm_Date'], h => /alarm date|incident date|published date/i.test(h));
+                let alarmNotesField = findCol(['Alarm Notes', 'Alarm_Notes', 'Issue Reported'], h => /alarm note|issue reported/i.test(h));
+                let allAlarmsField = findCol(['All_Historical_Alarms']);
+                let alarmCountField = findCol(['Fire_Incident_Count']);
+
+                // Coordinates
+                let latField = findCol(['Latitude', 'lat'], h => /^lat|latitude/i.test(h));
+                let lonField = findCol(['Longitude', 'lon', 'lng'], h => /^lon|^lng|longitude/i.test(h));
+                let leadGuidField = findCol(['(Do Not Modify) Lead', 'Note_GUID']);
 
                 let newOrUpdatedAccounts = [];
 
-                results.data.forEach(row => {
+                results.data.forEach((row, idx) => {
                     let bizName = extractTextData(row[nameField]); 
                     let street = extractTextData(row[addressField]);
-                    
-                    if (bizName && street) {
-                        let key = `${bizName.toLowerCase()}|${street.toLowerCase()}`;
-                        let existingIndex = allAccounts.findIndex(acc => acc.id === key);
+                    let extractedCityStateZip = cityStateField && row[cityStateField] ? extractTextData(row[cityStateField]) : 'Austin, TX';
+                    if (zipField && row[zipField] && !extractedCityStateZip.includes(extractTextData(row[zipField]))) {
+                        extractedCityStateZip = `${extractedCityStateZip}, TX ${extractTextData(row[zipField])}`.replace(/,\s*TX\s*,\s*TX/i, ', TX');
+                    }
+
+                    // Keep leads even if street was blank in CRM by falling back to City/State/Zip
+                    if (!street && bizName) {
+                        street = extractedCityStateZip || 'Austin, TX';
+                    }
+
+                    if (bizName) {
+                        let leadGuid = leadGuidField && row[leadGuidField] ? extractTextData(row[leadGuidField]) : '';
+                        let key = leadGuid ? leadGuid.toLowerCase() : `${bizName.toLowerCase()}|${street.toLowerCase()}`;
+                        let existingIndex = allAccounts.findIndex(acc => acc.id === key || `${(acc.Business_Name||'').toLowerCase()}|${(acc.Street_Address||'').toLowerCase()}` === `${bizName.toLowerCase()}|${street.toLowerCase()}`);
                         
-                        let extractedCityStateZip = row[cityStateField] ? extractTextData(row[cityStateField]) : '';
                         let rowLat = latField && row[latField] ? parseFloat(row[latField]) : null;
                         let rowLon = lonField && row[lonField] ? parseFloat(row[lonField]) : null;
+                        let rowNotes = (notesField ? extractTextData(row[notesField]) : '') || (latestNoteField ? extractTextData(row[latestNoteField]) : '');
+                        let rowLatestNote = latestNoteField ? extractTextData(row[latestNoteField]) : '';
+                        let rowNoteCount = noteCountField && row[noteCountField] ? parseInt(row[noteCountField], 10) || 0 : (rowNotes ? rowNotes.split(' | ').length : 0);
+                        let rowLatestNoteDate = latestNoteDateField ? extractTextData(row[latestNoteDateField]) : '';
+                        let rowAllAlarms = allAlarmsField ? extractTextData(row[allAlarmsField]) : '';
+                        let rowAlarmCount = alarmCountField && row[alarmCountField] ? parseInt(row[alarmCountField], 10) || 0 : 0;
 
                         if (existingIndex >= 0) {
                             let ex = allAccounts[existingIndex];
-                            ex.Contact_Name = extractTextData(row[contactField]) || ex.Contact_Name;
+                            ex.Business_Name = bizName || ex.Business_Name;
+                            ex.Street_Address = street || ex.Street_Address;
+                            ex.Contact_Name = (contactField ? extractTextData(row[contactField]) : '') || ex.Contact_Name;
                             ex.Job_Title = (titleField ? extractTextData(row[titleField]) : '') || ex.Job_Title;
-                            ex.Phone = extractTextData(row[phoneField]) || ex.Phone;
+                            ex.Phone = (phoneField ? extractTextData(row[phoneField]) : '') || ex.Phone;
+                            ex.Email = (emailField ? extractTextData(row[emailField]) : '') || ex.Email;
                             ex['City, State, Zip'] = extractedCityStateZip || ex['City, State, Zip'];
                             ex.Inspection_Date = (inspField ? extractTextData(row[inspField]) : '') || ex.Inspection_Date;
+                            ex.Inspection_Date_Source = (inspSourceField ? extractTextData(row[inspSourceField]) : '') || ex.Inspection_Date_Source;
+                            ex.CO_Original_Issued_Date = (coIssuedField ? extractTextData(row[coIssuedField]) : '') || ex.CO_Original_Issued_Date;
+                            ex.CRM_Notes = rowNotes || ex.CRM_Notes || '';
+                            ex.Latest_CRM_Note = rowLatestNote || ex.Latest_CRM_Note || '';
+                            ex.Note_Count = rowNoteCount || ex.Note_Count || 0;
+                            ex.Latest_Note_Date = rowLatestNoteDate || ex.Latest_Note_Date || '';
                             ex.Alarm_Date = (alarmDateField ? extractTextData(row[alarmDateField]) : '') || ex.Alarm_Date;
                             ex.Alarm_Notes = (alarmNotesField ? extractTextData(row[alarmNotesField]) : '') || ex.Alarm_Notes;
-                            if (rowLat && rowLon) { ex.lat = rowLat; ex.lon = rowLon; }
+                            ex.All_Historical_Alarms = rowAllAlarms || ex.All_Historical_Alarms || '';
+                            ex.Fire_Incident_Count = rowAlarmCount || ex.Fire_Incident_Count || 0;
+                            if (rowLat && rowLon && !isNaN(rowLat) && !isNaN(rowLon)) {
+                                ex.lat = rowLat;
+                                ex.lon = rowLon;
+                            }
                         } else {
                             newOrUpdatedAccounts.push({
                                 id: key,
                                 Business_Name: bizName,
                                 Street_Address: street,
                                 'City, State, Zip': extractedCityStateZip,
-                                Contact_Name: extractTextData(row[contactField]),
+                                Contact_Name: contactField ? extractTextData(row[contactField]) : '',
                                 Job_Title: titleField ? extractTextData(row[titleField]) : '',
-                                Phone: extractTextData(row[phoneField]),
+                                Phone: phoneField ? extractTextData(row[phoneField]) : '',
+                                Email: emailField ? extractTextData(row[emailField]) : '',
                                 Inspection_Date: inspField ? extractTextData(row[inspField]) : '',
+                                Inspection_Date_Source: inspSourceField ? extractTextData(row[inspSourceField]) : '',
+                                CO_Original_Issued_Date: coIssuedField ? extractTextData(row[coIssuedField]) : '',
+                                CRM_Notes: rowNotes,
+                                Latest_CRM_Note: rowLatestNote,
+                                Note_Count: rowNoteCount,
+                                Latest_Note_Date: rowLatestNoteDate,
                                 Alarm_Date: alarmDateField ? extractTextData(row[alarmDateField]) : '',
                                 Alarm_Notes: alarmNotesField ? extractTextData(row[alarmNotesField]) : '',
+                                All_Historical_Alarms: rowAllAlarms,
+                                Fire_Incident_Count: rowAlarmCount,
                                 lat: rowLat && !isNaN(rowLat) ? rowLat : null,
                                 lon: rowLon && !isNaN(rowLon) ? rowLon : null,
                                 visited: false,
@@ -683,11 +863,17 @@
         let needsGeo = accounts.filter(a => !a.lat || !a.lon);
         if (needsGeo.length === 0) return accounts;
 
+        // If bulk uploading (> 20 rows without coordinates), use instant Central TX ZIP/City coordinates so the app never freezes for 40 minutes
+        if (needsGeo.length > 20) {
+            needsGeo.forEach(acc => assignInstantCentralTxCoords(acc));
+            return accounts;
+        }
+
         document.getElementById('loading-overlay').style.display = 'flex';
         let processed = 0;
         
         for (let acc of needsGeo) {
-            document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${needsGeo.length}...\n(1 address/sec via OpenStreetMap)`;
+            document.getElementById('loading-text').innerText = `Mapping Lead ${processed + 1} of ${needsGeo.length}...`;
             try {
                 let query = `${acc.Street_Address}, ${acc['City, State, Zip']}`.trim();
                 let response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`);
@@ -697,12 +883,10 @@
                     acc.lat = parseFloat(data[0].lat);
                     acc.lon = parseFloat(data[0].lon);
                 } else {
-                    acc.lat = userLat + (Math.random() * 0.06 - 0.03);
-                    acc.lon = userLon + (Math.random() * 0.06 - 0.03);
+                    assignInstantCentralTxCoords(acc);
                 }
             } catch (e) {
-                acc.lat = userLat + (Math.random() * 0.06 - 0.03);
-                acc.lon = userLon + (Math.random() * 0.06 - 0.03);
+                assignInstantCentralTxCoords(acc);
             }
             processed++;
             await new Promise(r => setTimeout(r, 1050));
@@ -714,8 +898,9 @@
     function openManualModal() { document.getElementById('manual-modal').classList.add('active'); }
     function closeManualModal() {
         document.getElementById('manual-modal').classList.remove('active');
-        ['manual-name','manual-street','manual-city','manual-contact','manual-title','manual-phone','manual-insp'].forEach(id => {
-            document.getElementById(id).value = '';
+        ['manual-name','manual-street','manual-city','manual-contact','manual-title','manual-phone','manual-insp','manual-notes'].forEach(id => {
+            let el = document.getElementById(id);
+            if (el) el.value = '';
         });
     }
 
@@ -727,17 +912,27 @@
         let key = `${name.toLowerCase()}|${street.toLowerCase()}`;
         if (allAccounts.findIndex(acc => acc.id === key) >= 0) { alert("This property already exists."); return; }
 
+        let initialNote = extractTextData(document.getElementById('manual-notes').value);
+        let todayStr = new Date().toISOString().slice(0, 10);
+        let formattedNote = initialNote ? `[${todayStr}] ${initialNote}` : '';
+
         let newLead = [{
             id: key,
             Business_Name: name,
             Street_Address: street,
-            'City, State, Zip': extractTextData(document.getElementById('manual-city').value), 
+            'City, State, Zip': extractTextData(document.getElementById('manual-city').value) || 'Austin, TX', 
             Contact_Name: extractTextData(document.getElementById('manual-contact').value),
             Job_Title: extractTextData(document.getElementById('manual-title').value),
             Phone: extractTextData(document.getElementById('manual-phone').value),
+            Email: '',
             Inspection_Date: document.getElementById('manual-insp').value || '',
+            CRM_Notes: formattedNote,
+            Latest_CRM_Note: initialNote,
+            Note_Count: initialNote ? 1 : 0,
+            Latest_Note_Date: initialNote ? todayStr : '',
             Alarm_Date: '',
             Alarm_Notes: '',
+            All_Historical_Alarms: '',
             visited: false,
             surveys: [] 
         }];
@@ -773,15 +968,14 @@
             let distance = calculateDistance(userLat, userLon, acc.lat, acc.lon);
             if (distance > radius) return;
 
-            // Search Filter: Contact Name, Property Name, or Address
+            // Search Filter: Contact Name, Property Name, Address, or CRM Notes
             if (searchQuery) {
-                let searchable = `${acc.Business_Name || ''} ${acc.Contact_Name || ''} ${acc.Street_Address || ''} ${acc['City, State, Zip'] || ''}`.toLowerCase();
+                let searchable = `${acc.Business_Name || ''} ${acc.Contact_Name || ''} ${acc.Street_Address || ''} ${acc['City, State, Zip'] || ''} ${acc.CRM_Notes || ''}`.toLowerCase();
                 if (!searchable.includes(searchQuery)) return;
             }
 
             let status = evaluateAccountStatus(acc);
 
-            // Toggle Switches Filter
             if (anyToggleOn) {
                 let matchesToggle = (activeFilters.alarm && status.isAlarm30d) ||
                                     (activeFilters.insp && status.isInspDue60d) ||
@@ -802,7 +996,6 @@
             currentFilteredAccounts.push(acc);
         });
 
-        // Sort by closest to user GPS
         currentFilteredAccounts.sort((a, b) => a._distance - b._distance);
 
         renderClosestList();
@@ -823,15 +1016,16 @@
         }
 
         let html = '';
-        currentFilteredAccounts.slice(0, 100).forEach(acc => {
-            let contactStr = acc.Contact_Name ? ` • 👤 ${acc.Contact_Name}` : '';
+        currentFilteredAccounts.slice(0, 120).forEach(acc => {
+            let contactStr = acc.Contact_Name && !acc.Contact_Name.toLowerCase().includes('unknown') ? ` • 👤 ${acc.Contact_Name}` : '';
+            let noteBadge = acc.CRM_Notes ? ` • 📝 ${acc.Note_Count || 1} note${(acc.Note_Count || 1) > 1 ? 's' : ''}` : '';
             html += `
                 <div class="lead-row" onclick="selectLeadFromList('${encodeURIComponent(acc.id)}')">
                     <div class="lead-row-main">
                         <span class="lead-badge">${acc._emoji}</span>
                         <div class="lead-text">
                             <div class="lead-name">${acc.Business_Name}</div>
-                            <div class="lead-sub">${acc.Street_Address}${contactStr}</div>
+                            <div class="lead-sub">${acc.Street_Address}${contactStr}${noteBadge}</div>
                         </div>
                     </div>
                     <div class="lead-dist">${acc._distance.toFixed(1)} mi</div>
@@ -859,7 +1053,6 @@
         let curLat = currentSelectedAccount.lat;
         let curLon = currentSelectedAccount.lon;
 
-        // Pool of candidates: use active filtered leads if > 1, otherwise all accounts
         let pool = currentFilteredAccounts.length > 1 ? currentFilteredAccounts : allAccounts;
         let coneCandidates = [];
         let halfPlaneCandidates = [];
@@ -904,8 +1097,16 @@
     }
 
     /* =======================================================
-       RECORD PAGE (BOTTOM SHEET) UI
+       RECORD PAGE (PROPERTY CARD / BOTTOM SHEET) UI
        ======================================================= */
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
 
     function showDetails(acc) {
         currentSelectedAccount = acc;
@@ -919,8 +1120,9 @@
         document.getElementById('sheet-contact').innerText = acc.Contact_Name || 'N/A';
         document.getElementById('sheet-jobtitle').innerText = acc.Job_Title ? `🏷️ ${acc.Job_Title}` : '';
         document.getElementById('sheet-phone').innerText = acc.Phone || 'N/A';
+        document.getElementById('sheet-email').innerText = acc.Email || '';
 
-        // Status Banner & Inspection/Alarm Details
+        // Status Banner
         let banner = document.getElementById('sheet-status-banner');
         let badges = [];
         if (status.isAlarm30d) badges.push(`🚒 Alarm (${status.daysSinceAlarm}d ago)`);
@@ -936,8 +1138,37 @@
             banner.style.display = 'none';
         }
 
-        document.getElementById('sheet-insp').innerText = status.inspMonthName ? `${status.inspMonthName} 1st (Annual)` : (acc.Inspection_Date || 'N/A');
-        document.getElementById('sheet-alarm').innerText = acc.Alarm_Date ? `${acc.Alarm_Date}${acc.Alarm_Notes ? ' - ' + acc.Alarm_Notes : ''}` : 'None Recorded';
+        // Inspection Date & Source (CRM vs CO Inferred)
+        document.getElementById('sheet-insp').innerText = status.inspMonthName ? `${status.inspMonthName} 1st (${acc.Inspection_Date})` : (acc.Inspection_Date || 'Not Set');
+        let srcEl = document.getElementById('sheet-insp-source');
+        if (acc.CO_Original_Issued_Date) {
+            srcEl.innerText = `🏛️ CO Issued: ${acc.CO_Original_Issued_Date}`;
+        } else if (acc.Inspection_Date_Source && acc.Inspection_Date_Source !== 'Not Set') {
+            srcEl.innerText = `📌 ${acc.Inspection_Date_Source}`;
+        } else {
+            srcEl.innerText = '';
+        }
+
+        document.getElementById('sheet-alarm').innerText = acc.Alarm_Date ? `${acc.Alarm_Date}${acc.Fire_Incident_Count ? ' (' + acc.Fire_Incident_Count + ' total)' : ''}` : 'None Recorded';
+
+        // Render CRM Lead Notes on Property Card
+        renderPropertyCardNotes(acc);
+
+        // Render Historical Fire Alarms Audit Box
+        let alarmsBox = document.getElementById('sheet-alarms-box');
+        let alarmsListEl = document.getElementById('sheet-alarms-list');
+        let rawHistory = acc.All_Historical_Alarms || acc.Alarm_Notes || '';
+        if (acc.Alarm_Date || rawHistory) {
+            alarmsBox.style.display = 'block';
+            let entries = rawHistory.includes(' | ')
+                ? rawHistory.split(' | ')
+                : [`[${acc.Alarm_Date || 'Recorded'}] ${rawHistory}`];
+            document.getElementById('sheet-alarms-header').innerText = `🚒 AFD Alarm History (${acc.Fire_Incident_Count || entries.length})`;
+            alarmsListEl.innerHTML = entries.map(item => `<div class="alarm-entry">${escapeHtml(item)}</div>`).join('');
+        } else {
+            alarmsBox.style.display = 'none';
+            alarmsListEl.innerHTML = '';
+        }
         
         document.getElementById('action-nav').href = `https://www.google.com/maps/dir/?api=1&destination=${acc.lat},${acc.lon}`;
         
@@ -948,9 +1179,72 @@
         } else {
             callBtn.style.display = 'none';
         }
+
+        let emailBtn = document.getElementById('action-email-lead');
+        if (acc.Email) {
+            let subject = encodeURIComponent(`Fire & Life Safety Inspections - ${acc.Business_Name}`);
+            let greeting = acc.Contact_Name && !acc.Contact_Name.toLowerCase().includes('unknown') ? `Hi ${acc.Contact_Name.split(' ')[0]},` : `Hello,`;
+            let body = encodeURIComponent(`${greeting}\n\nI am reaching out regarding the upcoming fire and life safety inspections at ${acc.Business_Name} (${acc.Street_Address}).\n\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane, Ste #7-700\nAustin, TX 78728\n737-297-5660`);
+            emailBtn.href = `mailto:${acc.Email}?subject=${subject}&body=${body}`;
+            emailBtn.style.display = 'flex';
+        } else {
+            emailBtn.style.display = 'none';
+        }
         
         updateVisitButtonUI();
         document.getElementById('bottom-sheet').classList.add('active');
+    }
+
+    function renderPropertyCardNotes(acc) {
+        const headerEl = document.getElementById('sheet-notes-header');
+        const latestEl = document.getElementById('sheet-notes-latest');
+        const listEl = document.getElementById('sheet-notes-list');
+
+        let rawNotes = (acc.CRM_Notes || acc.Latest_CRM_Note || '').trim();
+        if (!rawNotes) {
+            headerEl.innerText = `📋 CRM Lead Notes (0)`;
+            latestEl.innerText = '';
+            listEl.innerHTML = `<div style="color: #888; font-style: italic; font-size: 0.8rem; padding: 4px 0;">No CRM timeline notes recorded for this property yet. Use the box below to add one.</div>`;
+            return;
+        }
+
+        // Split multi-note strings separated by " | " or newlines
+        let noteItems = rawNotes.split(/\s*\|\s*(?=\[\d{4}-\d{2}-\d{2}\])|\r?\n/).map(s => s.trim()).filter(Boolean);
+        let count = Math.max(acc.Note_Count || 0, noteItems.length);
+        headerEl.innerText = `📋 CRM Lead Notes (${count})`;
+        latestEl.innerText = acc.Latest_Note_Date ? `Latest: ${acc.Latest_Note_Date}` : '';
+
+        listEl.innerHTML = noteItems.map(item => {
+            let match = item.match(/^\[(\d{4}-\d{2}-\d{2})\]\s*(.*)$/);
+            if (match) {
+                return `<div class="note-entry"><span class="note-date-tag">📅 ${escapeHtml(match[1])}</span>${escapeHtml(match[2])}</div>`;
+            }
+            return `<div class="note-entry">${escapeHtml(item)}</div>`;
+        }).join('');
+    }
+
+    function addQuickLeadNote() {
+        if (!currentSelectedAccount) return;
+        const inputEl = document.getElementById('quick-note-input');
+        let text = (inputEl.value || '').trim();
+        if (!text) return;
+
+        let todayStr = new Date().toISOString().slice(0, 10);
+        let newEntry = `[${todayStr}] ${text}`;
+
+        if (currentSelectedAccount.CRM_Notes) {
+            currentSelectedAccount.CRM_Notes = `${newEntry} | ${currentSelectedAccount.CRM_Notes}`;
+        } else {
+            currentSelectedAccount.CRM_Notes = newEntry;
+        }
+        currentSelectedAccount.Latest_CRM_Note = text;
+        currentSelectedAccount.Latest_Note_Date = todayStr;
+        currentSelectedAccount.Note_Count = (parseInt(currentSelectedAccount.Note_Count, 10) || 0) + 1;
+
+        inputEl.value = '';
+        localStorage.setItem('firetrackr_accounts', JSON.stringify(allAccounts));
+        renderPropertyCardNotes(currentSelectedAccount);
+        renderClosestList();
     }
 
     function toggleVisit() {
@@ -1151,12 +1445,15 @@
         
         let pdfHtml = `<div style="padding: 20px;">`;
         pdfHtml += `<h2 style="color: #d32f2f; border-bottom: 2px solid #d32f2f; padding-bottom: 10px; margin-bottom: 15px;">Site Survey: ${acc.Business_Name}</h2>`;
-        pdfHtml += `<p style="margin-bottom: 30px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
+        pdfHtml += `<p style="margin-bottom: 15px; font-size: 16px;"><strong>Address:</strong> ${acc.Street_Address}, ${cleanCityState}</p>`;
+        if (acc.CRM_Notes) {
+            pdfHtml += `<p style="margin-bottom: 25px; font-size: 14px; background: #fffdf5; padding: 10px; border: 1px solid #ffe082; border-radius: 6px;"><strong>CRM Lead Notes:</strong> ${escapeHtml(acc.CRM_Notes)}</p>`;
+        }
 
         acc.surveys.forEach(bldg => {
             pdfHtml += `<div class="print-page-break" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px;">`;
             pdfHtml += `<h3 style="margin-top: 0; color: #673ab7; margin-bottom: 10px;">${bldg.name}</h3>`;
-            pdfHtml += `<p style="margin-bottom: 15px; font-size: 14px;"><strong>Inspection Due:</strong> ${bldg.inspectionDue || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
+            pdfHtml += `<p style="margin-bottom: 15px; font-size: 14px;"><strong>Inspection Due:</strong> ${bldg.inspectionDue || acc.Inspection_Date || 'N/A'} | <strong>Panel:</strong> ${bldg.panel || 'N/A'} | <strong>Communicator:</strong> ${bldg.dialer || 'N/A'}</p>`;
 
             pdfHtml += `<h4 style="margin-bottom: 5px; font-size: 15px;">Device Inventory (Estimated Totals):</h4><ul style="margin-top: 5px; margin-bottom: 15px; font-size: 14px;">`;
             let hasDevices = false;
@@ -1237,7 +1534,7 @@
             body += `\n=================================\n\n`;
         });
         
-        body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700<br>Austin, TX 78728\n737-297-5660`.replace('<br>', '\n');
+        body += `\nSeth Peterson\nService Sales Rep\nFiretrol Protection Systems\nTexas Licensed Fire Extinguisher Technician FEL-B-3464192\n4616 W. Howard Lane\nSte #7-700\nAustin, TX 78728\n737-297-5660`;
         window.location.href = `mailto:?subject=${subject}&body=${encodeURIComponent(body)}`;
     }
 
